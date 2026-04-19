@@ -63,7 +63,7 @@ export default function App() {
       </header>
 
       {/* Contenu */}
-      <main className="flex-1 overflow-auto p-4">
+      <main className="flex-1 overflow-auto p-4 pb-20">
         {page === "dashboard" && <Dashboard />}
         {page === "historique" && <Historique />}
         {page === "ajouter" && <Ajouter onSuccess={() => setPage("historique")} />}
@@ -71,7 +71,7 @@ export default function App() {
       </main>
 
       {/* Navigation bas (mobile) */}
-      <nav className="bg-gray-900 border-t border-gray-800 flex justify-around py-2">
+      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 flex justify-around py-2 z-50">
         {nav.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
