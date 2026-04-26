@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+import-comptes/serviceAccount.json
+import-comptes/serviceAccount.json.json
