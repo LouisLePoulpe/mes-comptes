@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react"
 import { db } from "../firebase"
 import { collection, addDoc, onSnapshot, Timestamp } from "firebase/firestore"
+import { encrypt, decrypt } from "../crypto"
 
-export default function Ajouter({ onSuccess }) {
+export default function Ajouter({ cryptoKey, onSuccess }) {
   const [form, setForm] = useState({
     type: "Sortie",
     montant: "",
@@ -15,22 +16,32 @@ export default function Ajouter({ onSuccess }) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "categories"), (snap) => {
-      setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    const unsub = onSnapshot(collection(db, "categories"), async (snap) => {
+      const decrypted = await Promise.all(snap.docs.map(async d => {
+        try {
+          const data = await decrypt(d.data(), cryptoKey)
+          return { id: d.id, ...data }
+        } catch {
+          return null
+        }
+      }))
+      setCategories(decrypted.filter(Boolean))
     })
     return unsub
-  }, [])
+  }, [cryptoKey])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const submit = async () => {
     if (!form.montant || !form.categorie) return alert("Montant et catégorie requis")
     setLoading(true)
-    await addDoc(collection(db, "transactions"), {
+    const data = {
       ...form,
       montant: parseFloat(form.montant),
-      date: Timestamp.fromDate(new Date(form.date))
-    })
+      date: new Date(form.date).toISOString()
+    }
+    const encrypted = await encrypt(data, cryptoKey)
+    await addDoc(collection(db, "transactions"), encrypted)
     setLoading(false)
     onSuccess()
   }
@@ -50,10 +61,8 @@ export default function Ajouter({ onSuccess }) {
     <div className="max-w-md mx-auto flex flex-col gap-4">
       <h2 className="text-2xl font-bold">Ajouter une transaction</h2>
 
-      {/* Type */}
       <div className="flex gap-2">{btnType("Entrée")}{btnType("Sortie")}</div>
 
-      {/* Montant */}
       <div>
         <label className="text-sm text-gray-400 mb-1 block">Montant (€)</label>
         <input
@@ -65,7 +74,6 @@ export default function Ajouter({ onSuccess }) {
         />
       </div>
 
-      {/* Banque */}
       <div>
         <label className="text-sm text-gray-400 mb-1 block">Banque</label>
         <div className="flex gap-2">
@@ -81,7 +89,6 @@ export default function Ajouter({ onSuccess }) {
         </div>
       </div>
 
-      {/* Catégorie */}
       <div>
         <label className="text-sm text-gray-400 mb-1 block">Catégorie</label>
         <select
@@ -94,7 +101,6 @@ export default function Ajouter({ onSuccess }) {
         </select>
       </div>
 
-      {/* Description */}
       <div>
         <label className="text-sm text-gray-400 mb-1 block">Description</label>
         <input
@@ -105,7 +111,6 @@ export default function Ajouter({ onSuccess }) {
         />
       </div>
 
-      {/* Date */}
       <div>
         <label className="text-sm text-gray-400 mb-1 block">Date</label>
         <input

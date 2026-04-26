@@ -1,27 +1,30 @@
 import { useState, useEffect } from "react"
 import { db } from "../firebase"
-import { collection, onSnapshot, deleteDoc, doc, orderBy, query, updateDoc, Timestamp } from "firebase/firestore"
-import { Trash2, Pencil, X } from "lucide-react"
+import { collection, onSnapshot, deleteDoc, doc, query, updateDoc } from "firebase/firestore"
+import { encrypt, decrypt } from "../crypto"
+import { Trash2, Pencil, X, Filter } from "lucide-react"
 import * as XLSX from "xlsx"
 
-function ModalEdition({ transaction, categories, onClose, onSave }) {
+function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
   const [form, setForm] = useState({
     type: transaction.type,
     montant: transaction.montant,
     banque: transaction.banque,
     categorie: transaction.categorie,
     description: transaction.description,
-    date: transaction.date?.toDate?.().toISOString().split("T")[0] ?? transaction.date
+    date: transaction.date?.split("T")[0] ?? transaction.date
   })
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const sauvegarder = async () => {
-    await updateDoc(doc(db, "transactions", transaction.id), {
+    const data = {
       ...form,
       montant: parseFloat(form.montant),
-      date: Timestamp.fromDate(new Date(form.date))
-    })
+      date: new Date(form.date).toISOString()
+    }
+    const encrypted = await encrypt(data, cryptoKey)
+    await updateDoc(doc(db, "transactions", transaction.id), encrypted)
     onSave()
   }
 
@@ -38,7 +41,7 @@ function ModalEdition({ transaction, categories, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-2xl w-full max-w-md flex flex-col gap-4 p-6">
+      <div className="bg-gray-900 rounded-2xl w-full max-w-md flex flex-col gap-4 p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-bold">Modifier la transaction</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-white transition">
@@ -117,26 +120,45 @@ function ModalEdition({ transaction, categories, onClose, onSave }) {
   )
 }
 
-export default function Historique() {
+const MOIS_NOMS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"]
+
+export default function Historique({ cryptoKey }) {
   const [transactions, setTransactions] = useState([])
   const [categories, setCategories] = useState([])
-  const [filtres, setFiltres] = useState({ banque: "", categorie: "", type: "", mois: "" })
+  const [filtres, setFiltres] = useState({ banque: "", categorie: "", type: "", mois: "", annee: "" })
   const [enEdition, setEnEdition] = useState(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   useEffect(() => {
-    const q = query(collection(db, "transactions"), orderBy("date", "desc"))
-    const unsub = onSnapshot(q, (snap) => {
-      setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    const q = query(collection(db, "transactions"))
+    const unsub = onSnapshot(q, async (snap) => {
+      const decrypted = await Promise.all(snap.docs.map(async d => {
+        try {
+          const data = await decrypt(d.data(), cryptoKey)
+          return { id: d.id, ...data }
+        } catch {
+          return null
+        }
+      }))
+      setTransactions(decrypted.filter(Boolean).sort((a,b) => new Date(b.date) - new Date(a.date)))
     })
     return unsub
-  }, [])
+  }, [cryptoKey])
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "categories"), (snap) => {
-      setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    const unsub = onSnapshot(collection(db, "categories"), async (snap) => {
+      const decrypted = await Promise.all(snap.docs.map(async d => {
+        try {
+          const data = await decrypt(d.data(), cryptoKey)
+          return { id: d.id, ...data }
+        } catch {
+          return null
+        }
+      }))
+      setCategories(decrypted.filter(Boolean))
     })
     return unsub
-  }, [])
+  }, [cryptoKey])
 
   const supprimer = async (id) => {
     if (confirm("Supprimer cette transaction ?")) {
@@ -151,7 +173,7 @@ export default function Historique() {
       Banque: t.banque,
       Catégorie: t.categorie,
       Description: t.description,
-      Date: t.date?.toDate?.().toLocaleDateString("fr-FR") ?? t.date
+      Date: new Date(t.date).toLocaleDateString("fr-FR")
     }))
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
@@ -159,36 +181,30 @@ export default function Historique() {
     XLSX.writeFile(wb, "mes-comptes.xlsx")
   }
 
-  // Liste des mois disponibles
-  const moisDisponibles = []
-  const vus = new Set()
-  transactions.forEach(t => {
-    const d = t.date?.toDate?.()
-    if (!d) return
-    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`
-    if (!vus.has(key)) { vus.add(key); moisDisponibles.push(key) }
-  })
-  moisDisponibles.sort().reverse()
+  const anneesDisponibles = [...new Set(transactions.map(t => new Date(t.date).getFullYear()).filter(Boolean))].sort().reverse()
 
-  const labelMois = (key) => {
-    const [y, m] = key.split("-")
-    return new Date(y, m-1).toLocaleDateString("fr-FR", { month:"long", year:"numeric" })
-  }
+  const moisDisponibles = [...new Set(transactions
+    .filter(t => !filtres.annee || new Date(t.date).getFullYear() === parseInt(filtres.annee))
+    .map(t => new Date(t.date).getMonth() + 1)
+    .filter(Boolean)
+  )].sort((a,b) => b - a)
 
   const filtrées = transactions.filter(t => {
     if (filtres.type && t.type !== filtres.type) return false
     if (filtres.banque && t.banque !== filtres.banque) return false
     if (filtres.categorie && t.categorie !== filtres.categorie) return false
-    if (filtres.mois) {
-      const d = t.date?.toDate?.()
-      if (!d) return false
-      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`
-      if (key !== filtres.mois) return false
-    }
+    const d = new Date(t.date)
+    if (filtres.annee && d.getFullYear() !== parseInt(filtres.annee)) return false
+    if (filtres.mois && d.getMonth() + 1 !== parseInt(filtres.mois)) return false
     return true
   })
 
-  const setF = (k, v) => setFiltres(f => ({ ...f, [k]: v }))
+  const setF = (k, v) => {
+    if (k === "annee") setFiltres(f => ({ ...f, annee: v, mois: "" }))
+    else setFiltres(f => ({ ...f, [k]: v }))
+  }
+
+  const nbFiltresActifs = Object.values(filtres).filter(v => v !== "").length
   const categoriesListe = [...new Set(transactions.map(t => t.categorie).filter(Boolean))]
 
   return (
@@ -197,11 +213,91 @@ export default function Historique() {
         <ModalEdition
           transaction={enEdition}
           categories={categories}
+          cryptoKey={cryptoKey}
           onClose={() => setEnEdition(null)}
           onSave={() => setEnEdition(null)}
         />
       )}
 
+      {/* Drawer filtres */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-[200] flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setDrawerOpen(false)} />
+          <div className="relative bg-gray-900 rounded-t-3xl p-6 flex flex-col gap-4 z-10 max-h-[85vh] overflow-y-auto pb-24">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-bold">Filtres</h3>
+              <button onClick={() => setFiltres({ banque: "", categorie: "", type: "", mois: "", annee: "" })}
+                className="text-sm text-emerald-400">
+                Réinitialiser
+              </button>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-400 mb-2 block">Type</label>
+              <div className="flex gap-2">
+                {["Entrée", "Sortie"].map(t => (
+                  <button key={t} onClick={() => setF("type", filtres.type === t ? "" : t)}
+                    className={`flex-1 py-2 rounded-xl text-sm font-semibold transition ${
+                      filtres.type === t ? "bg-emerald-500 text-white" : "bg-gray-800 text-gray-400"
+                    }`}>{t}</button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-400 mb-2 block">Banque</label>
+              <div className="flex gap-2">
+                {["BB", "CMB", "TR"].map(b => (
+                  <button key={b} onClick={() => setF("banque", filtres.banque === b ? "" : b)}
+                    className={`flex-1 py-2 rounded-xl text-sm font-semibold transition ${
+                      filtres.banque === b ? "bg-blue-500 text-white" : "bg-gray-800 text-gray-400"
+                    }`}>{b}</button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-400 mb-2 block">Catégorie</label>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {categoriesListe.map(c => (
+                  <button key={c} onClick={() => setF("categorie", filtres.categorie === c ? "" : c)}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition shrink-0 ${
+                      filtres.categorie === c ? "bg-purple-500 text-white" : "bg-gray-800 text-gray-400"
+                    }`}>{c}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="text-xs text-gray-400 mb-2 block">Année</label>
+                <select value={filtres.annee} onChange={e => setF("annee", e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
+                  <option value="">Toutes</option>
+                  {anneesDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-gray-400 mb-2 block">Mois</label>
+                <select value={filtres.mois} onChange={e => setF("mois", e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
+                  <option value="">Tous</option>
+                  {moisDisponibles.map(m => <option key={m} value={m}>{MOIS_NOMS[m-1]}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setDrawerOpen(false)}
+              className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl transition mt-2"
+            >
+              Appliquer
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold">Historique</h2>
         <button
@@ -210,29 +306,25 @@ export default function Historique() {
         >Export Excel</button>
       </div>
 
-      {/* Filtres */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <select value={filtres.type} onChange={e => setF("type", e.target.value)}
-          className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
-          <option value="">Tous types</option>
-          <option>Entrée</option>
-          <option>Sortie</option>
-        </select>
-        <select value={filtres.banque} onChange={e => setF("banque", e.target.value)}
-          className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
-          <option value="">Toutes banques</option>
-          {["BB", "CMB", "TR"].map(b => <option key={b}>{b}</option>)}
-        </select>
-        <select value={filtres.categorie} onChange={e => setF("categorie", e.target.value)}
-          className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
-          <option value="">Toutes catégories</option>
-          {categoriesListe.map(c => <option key={c}>{c}</option>)}
-        </select>
-        <select value={filtres.mois} onChange={e => setF("mois", e.target.value)}
-          className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
-          <option value="">Tous les mois</option>
-          {moisDisponibles.map(m => <option key={m} value={m}>{labelMois(m)}</option>)}
-        </select>
+      {/* Bouton Filtrer */}
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-sm text-gray-400">
+          {filtrées.length} transaction{filtrées.length > 1 ? "s" : ""}
+        </span>
+        <button
+          onClick={() => setDrawerOpen(true)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${
+            nbFiltresActifs > 0 ? "bg-emerald-500 text-white" : "bg-gray-800 text-gray-300"
+          }`}
+        >
+          <Filter size={16} />
+          Filtrer
+          {nbFiltresActifs > 0 && (
+            <span className="bg-white text-emerald-500 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+              {nbFiltresActifs}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Liste */}
@@ -249,7 +341,7 @@ export default function Historique() {
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{t.description || "—"}</p>
                 <p className="text-xs text-gray-500">
-                  {t.banque} · {t.categorie} · {t.date?.toDate?.().toLocaleDateString("fr-FR") ?? t.date}
+                  {t.banque} · {t.categorie} · {new Date(t.date).toLocaleDateString("fr-FR")}
                 </p>
               </div>
             </div>

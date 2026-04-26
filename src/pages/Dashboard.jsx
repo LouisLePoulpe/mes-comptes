@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { db } from "../firebase"
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore"
+import { collection, onSnapshot, query } from "firebase/firestore"
+import { decrypt } from "../crypto"
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -20,25 +21,33 @@ function regression(data, key) {
   return data.map((d, i) => ({ ...d, [`${key}_trend`]: Math.round(a * i + b) }))
 }
 
-export default function Dashboard() {
+export default function Dashboard({ cryptoKey }) {
   const moisCourant = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}`
   const [transactions, setTransactions] = useState([])
   const [moisFiltre, setMoisFiltre] = useState(moisCourant)
   const [courbes, setCourbes] = useState({ BB: true, CMB: true, TR: true })
 
   useEffect(() => {
-    const q = query(collection(db, "transactions"), orderBy("date", "asc"))
-    const unsub = onSnapshot(q, (snap) => {
-      setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    const q = query(collection(db, "transactions"))
+    const unsub = onSnapshot(q, async (snap) => {
+      const decrypted = await Promise.all(snap.docs.map(async d => {
+        try {
+          const data = await decrypt(d.data(), cryptoKey)
+          return { id: d.id, ...data }
+        } catch {
+          return null
+        }
+      }))
+      setTransactions(decrypted.filter(Boolean).sort((a,b) => new Date(a.date) - new Date(b.date)))
     })
     return unsub
-  }, [])
+  }, [cryptoKey])
 
   // Liste des mois disponibles
   const moisDisponibles = []
   const vus = new Set()
   transactions.forEach(t => {
-    const d = t.date?.toDate?.()
+    const d = new Date(t.date)
     if (!d) return
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`
     if (!vus.has(key)) { vus.add(key); moisDisponibles.push(key) }
@@ -52,7 +61,7 @@ export default function Dashboard() {
 
   // Filtrage par mois
   const filtrées = moisFiltre === "all" ? transactions : transactions.filter(t => {
-    const d = t.date?.toDate?.()
+    const d = new Date(t.date)
     if (!d) return false
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`
     return key === moisFiltre
@@ -68,14 +77,13 @@ export default function Dashboard() {
     else totalSorties += t.montant
   })
 
-  // Graphique progression (toutes les transactions)
+  // Graphique progression
   const graphData = []
   const running = { BB: 0, CMB: 0, TR: 0 }
   transactions.forEach(t => {
     const m = t.type === "Entrée" ? t.montant : -t.montant
     running[t.banque] += m
-    const d = t.date?.toDate?.()
-    const date = d ? d.toLocaleDateString("fr-FR") : t.date
+    const date = new Date(t.date).toLocaleDateString("fr-FR")
     graphData.push({
       date,
       BB: Math.round(running.BB),
@@ -91,8 +99,13 @@ export default function Dashboard() {
 
   // Camembert
   const parCategorie = {}
-  filtrées.filter(t => t.type === "Sortie").forEach(t => {
-    parCategorie[t.categorie] = (parCategorie[t.categorie] || 0) + t.montant
+  filtrées.forEach(t => {
+    const montant = t.type === "Sortie" ? t.montant : -t.montant
+    parCategorie[t.categorie] = (parCategorie[t.categorie] || 0) + montant
+  })
+  // Garder uniquement les valeurs positives (dépenses nettes)
+  Object.keys(parCategorie).forEach(k => {
+    if (parCategorie[k] <= 0) delete parCategorie[k]
   })
   const pieData = Object.entries(parCategorie)
     .sort((a,b) => b[1]-a[1])
@@ -155,9 +168,9 @@ export default function Dashboard() {
               {pieData.map((entry, i) => {
                 const pct = totalEntrees > 0 ? Math.round((entry.value / totalEntrees) * 100) : 0
                 let couleur = "text-emerald-400"
-                if (entry.name === "Charges" && pct > 50) couleur = "text-red-400"
-                if (entry.name === "Plaisir"  && pct > 30) couleur = "text-red-400"
-                if (entry.name === "Épargne"  && pct < 20) couleur = "text-red-400"
+                if (entry.name.includes("Charges") && pct > 50) couleur = "text-red-400"
+                if (entry.name.includes("Plaisir")  && pct > 30) couleur = "text-red-400"
+                if (entry.name.includes("Épargne")  && pct < 20) couleur = "text-red-400"
                 return (
                   <div key={entry.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

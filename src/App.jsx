@@ -1,27 +1,76 @@
 import { useState, useEffect } from "react"
-import { auth, googleProvider } from "./firebase"
+import { auth, googleProvider, db } from "./firebase"
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth"
+import { doc, getDoc, setDoc } from "firebase/firestore"
+import { loadKeyLocally, clearKeyLocally, encrypt, decrypt } from "./crypto"
 import Dashboard from "./pages/Dashboard"
 import Historique from "./pages/Historique"
 import Ajouter from "./pages/Ajouter"
 import Categories from "./pages/Categories"
+import Setup from "./pages/Setup"
+import Unlock from "./pages/Unlock"
 import { LayoutDashboard, History, PlusCircle, Tags, LogOut } from "lucide-react"
 
 export default function App() {
   const [user, setUser] = useState(null)
   const [page, setPage] = useState("dashboard")
   const [loading, setLoading] = useState(true)
+  const [cryptoKey, setCryptoKey] = useState(null)
+  const [cryptoState, setCryptoState] = useState("checking") // "checking" | "setup" | "unlock" | "ready"
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u)
+      if (u) {
+        await checkCryptoState()
+      } else {
+        setCryptoState("checking")
+      }
       setLoading(false)
     })
     return unsub
   }, [])
 
+  const checkCryptoState = async () => {
+    // Vérifier si la config crypto existe dans Firestore
+    const configDoc = await getDoc(doc(db, "config", "crypto"))
+    if (!configDoc.exists()) {
+      // Première fois — setup requis
+      setCryptoState("setup")
+      return
+    }
+
+    // Config existe — vérifier si la clé est en local
+    const localKey = await loadKeyLocally()
+    if (localKey) {
+      setCryptoKey(localKey.key)
+      setCryptoState("ready")
+    } else {
+      // Clé pas en local — demander la passphrase
+      setCryptoState("unlock")
+    }
+  }
+
+  const handleSetupComplete = async (key) => {
+    // Créer un doc de vérification chiffré
+    const encrypted = await encrypt({ verif: "ok" }, key)
+    await setDoc(doc(db, "config", "verif"), { encrypted })
+    setCryptoKey(key)
+    setCryptoState("ready")
+  }
+
+  const handleUnlockComplete = (key) => {
+    setCryptoKey(key)
+    setCryptoState("ready")
+  }
+
   const login = () => signInWithPopup(auth, googleProvider)
-  const logout = () => signOut(auth)
+  const logout = () => {
+    clearKeyLocally()
+    setCryptoKey(null)
+    setCryptoState("checking")
+    signOut(auth)
+  }
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
@@ -42,6 +91,15 @@ export default function App() {
     </div>
   )
 
+  if (cryptoState === "checking") return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
+      Vérification du chiffrement...
+    </div>
+  )
+
+  if (cryptoState === "setup") return <Setup onComplete={handleSetupComplete} />
+  if (cryptoState === "unlock") return <Unlock onComplete={handleUnlockComplete} />
+
   const nav = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "historique", label: "Historique", icon: History },
@@ -51,7 +109,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      {/* Header */}
       <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between">
         <h1 className="text-xl font-bold text-emerald-400">💰 Mes Comptes</h1>
         <div className="flex items-center gap-3">
@@ -62,15 +119,13 @@ export default function App() {
         </div>
       </header>
 
-      {/* Contenu */}
       <main className="flex-1 overflow-auto p-4 pb-20">
-        {page === "dashboard" && <Dashboard />}
-        {page === "historique" && <Historique />}
-        {page === "ajouter" && <Ajouter onSuccess={() => setPage("historique")} />}
-        {page === "categories" && <Categories />}
+        {page === "dashboard" && <Dashboard cryptoKey={cryptoKey} />}
+        {page === "historique" && <Historique cryptoKey={cryptoKey} />}
+        {page === "ajouter" && <Ajouter cryptoKey={cryptoKey} onSuccess={() => setPage("historique")} />}
+        {page === "categories" && <Categories cryptoKey={cryptoKey} />}
       </main>
 
-      {/* Navigation bas (mobile) */}
       <nav className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 flex justify-around py-2 z-50">
         {nav.map(({ id, label, icon: Icon }) => (
           <button
