@@ -21,6 +21,8 @@ function regression(data, key) {
   return data.map((d, i) => ({ ...d, [`${key}_trend`]: Math.round(a * i + b) }))
 }
 
+const stripEmojis = (str) => str?.replace(/[\u{1F000}-\u{1FFFF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{FE00}-\u{FE0F}|\u{1F900}-\u{1F9FF}|\u{1FA00}-\u{1FAFF}]/gu, "").trim() || ""
+
 export default function Dashboard({ cryptoKey }) {
   const moisCourant = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}`
   const [transactions, setTransactions] = useState([])
@@ -69,13 +71,17 @@ export default function Dashboard({ cryptoKey }) {
 
   // KPIs
   const soldes = { BB: 0, CMB: 0, TR: 0 }
-  let totalEntrees = 0, totalSorties = 0
+  let totalSorties = 0
   filtrées.forEach(t => {
     const m = t.type === "Entrée" ? t.montant : -t.montant
     soldes[t.banque] = (soldes[t.banque] || 0) + m
-    if (t.type === "Entrée") totalEntrees += t.montant
-    else totalSorties += t.montant
+    if (t.type === "Sortie") totalSorties += t.montant
   })
+
+  // Entrées BB uniquement pour le calcul des pourcentages
+  const entreesBB = filtrées
+    .filter(t => t.type === "Entrée" && t.banque === "BB")
+    .reduce((sum, t) => sum + t.montant, 0)
 
   // Graphique progression
   const graphData = []
@@ -97,15 +103,24 @@ export default function Dashboard({ cryptoKey }) {
   graphDataWithTrend = regression(graphDataWithTrend, "CMB")
   graphDataWithTrend = regression(graphDataWithTrend, "TR")
 
-  // Camembert — seulement les Sorties
+  // Camembert
+  // Pass 1 : accumuler uniquement les non-Retrait
   const parCategorie = {}
-  filtrées.filter(t => t.type === "Sortie").forEach(t => {
-    parCategorie[t.categorie] = (parCategorie[t.categorie] || 0) + t.montant
-  })
-  // Déduire les retraits d'épargne (Entrée BB = argent qui revient de l'épargne)
-  filtrées.filter(t => t.type === "Entrée" && t.banque === "BB" && t.categorie?.includes("pargne")).forEach(t => {
-    parCategorie[t.categorie] = (parCategorie[t.categorie] || 0) - t.montant
-  })
+  filtrées
+    .filter(t => t.type === "Sortie" && !t.categorie?.includes("Retrait"))
+    .forEach(t => {
+      parCategorie[t.categorie] = (parCategorie[t.categorie] || 0) + t.montant
+    })
+
+  // Pass 2 : soustraire les Retrait de leur catégorie cible
+  filtrées
+    .filter(t => t.type === "Sortie" && t.categorie?.includes("Retrait"))
+    .forEach(t => {
+      const motsCle = stripEmojis(t.categorie).replace(/Retrait/g, "").trim()
+      const catCible = Object.keys(parCategorie).find(k => stripEmojis(k).includes(motsCle))
+      if (catCible) parCategorie[catCible] -= t.montant
+    })
+
   // Supprimer les valeurs négatives ou nulles
   Object.keys(parCategorie).forEach(k => {
     if (parCategorie[k] <= 0) delete parCategorie[k]
@@ -170,7 +185,7 @@ export default function Dashboard({ cryptoKey }) {
             </ResponsiveContainer>
             <div className="flex flex-col gap-2 w-full">
               {pieData.map((entry, i) => {
-                const pct = totalEntrees > 0 ? Math.round((entry.value / totalEntrees) * 100) : 0
+                const pct = entreesBB > 0 ? Math.round((entry.value / entreesBB) * 100) : 0
                 let couleur = "text-emerald-400"
                 if (entry.name.includes("Charges") && pct > 50) couleur = "text-red-400"
                 if (entry.name.includes("Plaisir")  && pct > 30) couleur = "text-red-400"
