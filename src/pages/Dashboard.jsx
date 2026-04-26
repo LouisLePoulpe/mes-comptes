@@ -97,16 +97,20 @@ export default function Dashboard({ cryptoKey }) {
   graphDataWithTrend = regression(graphDataWithTrend, "CMB")
   graphDataWithTrend = regression(graphDataWithTrend, "TR")
 
-  // Camembert
+  // Camembert — seulement les Sorties
   const parCategorie = {}
-  filtrées.forEach(t => {
-    const montant = t.type === "Sortie" ? t.montant : -t.montant
-    parCategorie[t.categorie] = (parCategorie[t.categorie] || 0) + montant
+  filtrées.filter(t => t.type === "Sortie").forEach(t => {
+    parCategorie[t.categorie] = (parCategorie[t.categorie] || 0) + t.montant
   })
-  // Garder uniquement les valeurs positives (dépenses nettes)
+  // Déduire les retraits d'épargne (Entrée BB = argent qui revient de l'épargne)
+  filtrées.filter(t => t.type === "Entrée" && t.banque === "BB" && t.categorie?.includes("pargne")).forEach(t => {
+    parCategorie[t.categorie] = (parCategorie[t.categorie] || 0) - t.montant
+  })
+  // Supprimer les valeurs négatives ou nulles
   Object.keys(parCategorie).forEach(k => {
     if (parCategorie[k] <= 0) delete parCategorie[k]
   })
+
   const pieData = Object.entries(parCategorie)
     .sort((a,b) => b[1]-a[1])
     .map(([name, value]) => ({ name, value: Math.round(value) }))
@@ -170,7 +174,7 @@ export default function Dashboard({ cryptoKey }) {
                 let couleur = "text-emerald-400"
                 if (entry.name.includes("Charges") && pct > 50) couleur = "text-red-400"
                 if (entry.name.includes("Plaisir")  && pct > 30) couleur = "text-red-400"
-                if (entry.name.includes("Épargne")  && pct < 20) couleur = "text-red-400"
+                if (entry.name.includes("pargne")   && pct < 20) couleur = "text-red-400"
                 return (
                   <div key={entry.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
