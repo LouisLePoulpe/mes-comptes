@@ -17,8 +17,8 @@
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#030712</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/mes_comptes_icon</item>
+        <item name="windowSplashScreenBackground">#071c14</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/poulpecule</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>

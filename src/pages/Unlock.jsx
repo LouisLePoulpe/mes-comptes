@@ -1,3 +1,4 @@
+import Brand from "../components/Brand"
 import { useState } from "react"
 import { userDoc } from "../data/references"
 import { getDoc } from "firebase/firestore"
@@ -70,7 +71,7 @@ export default function Unlock({ uid, onComplete }) {
     <div className="min-h-screen bg-app text-foreground flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-md flex flex-col gap-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-positive mb-2">🔐 Mes Comptes</h1>
+          <h1 className="text-3xl font-bold text-positive mb-2"><Brand /></h1>
           <p className="text-muted text-sm">Entre ta passphrase pour accéder à tes données</p>
         </div>
 

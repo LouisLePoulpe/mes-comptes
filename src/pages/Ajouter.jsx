@@ -12,6 +12,7 @@ export default function Ajouter({ cryptoKey, onSuccess }) {
     type: "Sortie",
     montant: "",
     banque: accounts[0]?.id || "",
+    banqueDest: "",
     categorie: "",
     description: "",
     date: new Date().toISOString().split("T")[0]
@@ -30,6 +31,7 @@ export default function Ajouter({ cryptoKey, onSuccess }) {
     try { montant = calculateAmount(form.montant) } catch (error) { return setError(error.message) }
     if (!form.date || !Number.isFinite(Date.parse(form.date))) return setError("Choisis une date valide.")
     if (!form.categorie) return setError("Choisis une catégorie.")
+    if (form.type === 'Transfert' && (!accounts.some(a => a.id === form.banqueDest) || form.banqueDest === form.banque)) return setError('Choisis un compte de destination différent.')
     setLoading(true)
     try {
       const data = {
@@ -62,8 +64,9 @@ export default function Ajouter({ cryptoKey, onSuccess }) {
       {error && <p role="alert" className="text-negative">{error}</p>}
       {!accounts.length && <p>Crée un compte dans Comptes avant de saisir une transaction.</p>}
 
-      <div className="flex gap-2">{btnType("Entrée")}{btnType("Sortie")}</div>
+      <div className="flex gap-2">{btnType("Entrée")}{btnType("Sortie")}{btnType("Transfert")}</div>
 
+      {form.type === 'Transfert' && <label>Compte de destination<select className="w-full bg-field border border-line rounded-xl p-3" value={form.banqueDest} onChange={e => set("banqueDest", e.target.value)}><option value="">Choisir un compte</option>{accounts.filter(a => a.id !== form.banque).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>}
       <AmountInput id="Ajouter-montant" value={form.montant} onChange={value => set("montant", value)} />
 
       <div>

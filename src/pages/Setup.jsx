@@ -1,3 +1,4 @@
+import Brand from "../components/Brand"
 import { useState } from "react"
 import { db } from "../firebase"
 import { userDoc } from "../data/references"
@@ -59,7 +60,7 @@ export default function Setup({ uid, onComplete }) {
     <div className="min-h-screen bg-app text-foreground flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-md flex flex-col gap-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-positive mb-2">🔐 Chiffrement</h1>
+          <div className="mb-4"><Brand /></div><h1 className="text-3xl font-bold text-positive mb-2">Chiffrement</h1>
           <p className="text-muted text-sm">Crée une passphrase pour ton coffre personnel. Tu pourras ensuite importer ton export Excel dans l’historique. Si une migration de ton coffre existant est prévue, attends cette migration.</p>
         </div>
 

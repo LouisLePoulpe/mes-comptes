@@ -3,11 +3,11 @@ import * as XLSX from 'xlsx'
 export const EXCEL_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 export function createExport(transactions, accountName) {
   const rows = transactions.map(t => ({
-    Type: t.type, Montant: t.montant, Banque: accountName(t.banque), Catégorie: t.categorie,
+    Type: t.type, Montant: t.montant, Banque: accountName(t.banque), BanqueDest: t.type === 'Transfert' ? accountName(t.banqueDest) : '', Catégorie: t.categorie,
     Description: t.description || '', Date: new Date(t.date).toLocaleDateString('fr-FR', { timeZone: 'UTC' }),
   }))
   const book = XLSX.utils.book_new()
-  const sheet = XLSX.utils.json_to_sheet(rows, { header: ['Type', 'Montant', 'Banque', 'Catégorie', 'Description', 'Date'] })
+  const sheet = XLSX.utils.json_to_sheet(rows, { header: ['Type', 'Montant', 'Banque', 'BanqueDest', 'Catégorie', 'Description', 'Date'] })
   XLSX.utils.book_append_sheet(book, sheet, 'Transactions')
   return new File([XLSX.write(book, { bookType: 'xlsx', type: 'array' })], 'mes-comptes.xlsx', { type: EXCEL_TYPE })
 }

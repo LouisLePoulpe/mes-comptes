@@ -1,3 +1,4 @@
+import { accountMovements } from "../domain/movements"
 import { useState } from "react"
 import { useData } from "../data/context"
 import {
@@ -5,7 +6,7 @@ import {
   PieChart, Pie, Cell
 } from "recharts"
 
-const COULEURS_PIE = ["#10b981", "#f97316", "#60a5fa", "#a78bfa", "#f43f5e", "#facc15"]
+const COULEURS_PIE = ["#3e9950", "#bc9d4a", "#5aafa0", "#8b78ad", "#cf6f68", "#82b940"]
 
 function regression(data, key) {
   const n = data.length
@@ -66,8 +67,7 @@ export default function Dashboard() {
   const soldes = Object.fromEntries(accounts.map(a => [a.id, 0]))
   let totalSorties = 0
   filtrées.forEach(t => {
-    const m = t.type === "Entrée" ? t.montant : -t.montant
-    soldes[t.banque] = (soldes[t.banque] || 0) + m
+    for (const [id, amount] of accountMovements(t)) soldes[id] = (soldes[id] || 0) + amount
     if (t.type === "Sortie") totalSorties += t.montant
   })
 
@@ -80,8 +80,7 @@ export default function Dashboard() {
   const graphData = []
   const running = Object.fromEntries(accounts.map(a => [a.id, 0]))
   transactions.forEach(t => {
-    const m = t.type === "Entrée" ? t.montant : -t.montant
-    running[t.banque] = (running[t.banque] || 0) + m
+    for (const [id, amount] of accountMovements(t)) running[id] = (running[id] || 0) + amount
     const date = new Date(t.date).toLocaleDateString("fr-FR")
     graphData.push({
       date,

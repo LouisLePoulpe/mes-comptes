@@ -27,6 +27,9 @@ export async function setup(page) {
 }
 
 export async function navigate(page, name) {
-  await page.getByRole('navigation').getByRole('button', { name, exact: true }).click()
+  if (['Comptes', 'Catégories'].includes(name)) {
+    await page.getByRole('navigation').getByRole('button', { name: 'Paramètres', exact: true }).click()
+    await page.getByRole('button', { name: new RegExp('^' + name) }).click()
+  } else await page.getByRole('navigation').getByRole('button', { name, exact: true }).click()
 }
 

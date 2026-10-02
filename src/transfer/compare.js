@@ -1,5 +1,5 @@
 // Compare occurrences, not just totals: duplicate rows and offsetting errors matter.
-const key = row => JSON.stringify([row.type, Math.round(row.montant * 100), row.banque, (row.categorie || '').trim(), (row.description || '').trim(), row.date.slice(0, 10)])
+const key = row => JSON.stringify([row.type, Math.round(row.montant * 100), row.banque, (row.categorie || '').trim(), (row.description || '').trim(), row.date.slice(0, 10), ...(row.type === 'Transfert' ? [row.banqueDest] : [])])
 export function compareHistory(expected, actual) {
   const counts = new Map()
   for (const row of actual) counts.set(key(row), (counts.get(key(row)) || 0) + 1)

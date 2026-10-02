@@ -28,7 +28,7 @@ test('import V1 confirmé, doublons, recherche, calculs, thème et export intég
   await expect(page.getByText(`features-${info.project.name}@example.test`, { exact: true })).toBeVisible()
   await page.getByRole('button',{name:'Activer le mode clair'}).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme','light')
-  expect(await page.locator('body').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(248, 250, 252)')
+  expect(await page.locator('body').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(242, 248, 238)')
   await chooseImport(page,[...records,{...records[0],Date:'31/02/2025'}])
   await expect(page.getByRole('alert')).toContainText('aucune ligne n’a été ajoutée')
   await expect(page.getByRole('button',{name:'Confirmer l’import'})).toBeHidden()
@@ -83,6 +83,7 @@ test('import V1 confirmé, doublons, recherche, calculs, thème et export intég
   await page.getByRole('combobox').selectOption('all')
   await page.screenshot({path:info.outputPath('mode-clair.png'),fullPage:true})
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+  await navigate(page, 'Paramètres')
   await page.getByRole('button',{name:'Activer le mode sombre'}).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme','dark')
 })
@@ -145,4 +146,34 @@ test('un import interrompu après 100 lignes reprend sans perte ni doublon', asy
   await expect(page.getByRole('status')).toHaveText('Import terminé : 105 ajoutées, 100 déjà présentes.')
   await page.getByRole('button',{name:'Retour',exact:true}).click()
   await expect(page.getByText('205 transactions',{exact:true})).toBeVisible()
+})
+
+
+test('transferts importés : deux comptes, soldes et export préservés', async ({ page }, info) => {
+  await page.goto('./')
+  await login(page, `transfers-${info.project.name}@example.test`)
+  await setup(page)
+  await chooseImport(page, [
+    { Type:'Entrée',Montant:100,Banque:'Départ',BanqueDest:'',Catégorie:'Salaire',Description:'Solde fictif',Date:'01/01/2001' },
+    { Type:'Transfert',Montant:35.5,Banque:'Départ',BanqueDest:'Arrivée',Catégorie:'Virement',Description:'Transfert fictif',Date:'02/01/2001' },
+    { Type:'Sortie',Montant:10,Banque:'Arrivée',BanqueDest:'',Catégorie:'Courses',Description:'Achat fictif',Date:'03/01/2001' },
+  ])
+  await page.getByRole('button', { name: 'Préparer l’aperçu' }).click()
+  await page.getByRole('button', { name: 'Confirmer l’import' }).click()
+  await expect(page.getByRole('status')).toContainText('3 ajoutées')
+  await page.getByRole('button', { name: 'Vérifier la cohérence avec cet export' }).click()
+  await expect(page.getByRole('region', { name: 'Comparaison de l’historique' })).toContainText('Historique identique')
+  await navigate(page, 'Dashboard')
+  await page.getByRole('combobox').selectOption('all')
+  await expect(page.getByText('64.50 €', {exact:true})).toBeVisible()
+  await expect(page.getByText('25.50 €', {exact:true})).toBeVisible()
+  await expect(page.getByText('10.00 €', {exact:true})).toBeVisible()
+  await navigate(page, 'Historique')
+  await page.getByRole('button', {name:'Modifier Transfert fictif'}).click()
+  await expect(page.getByLabel('Compte de destination')).not.toHaveValue('')
+  await page.getByRole('button', {name:'Sauvegarder'}).click()
+  await expect(page.getByText('↔ 35.5€', {exact:true})).toBeVisible()
+  await expect(page.getByRole('navigation').getByRole('button')).toHaveCount(4)
+  await navigate(page, 'Paramètres')
+  await page.screenshot({path:info.outputPath('parametres-poulpecule.png'),fullPage:true})
 })

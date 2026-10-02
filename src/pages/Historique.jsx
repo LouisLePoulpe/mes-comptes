@@ -17,6 +17,7 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
     type: transaction.type,
     montant: transaction.montant,
     banque: transaction.banque,
+    banqueDest: transaction.banqueDest || "",
     categorie: transaction.categorie,
     description: transaction.description,
     date: transaction.date?.split("T")[0] ?? transaction.date
@@ -30,6 +31,7 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
     let montant
     try { montant = calculateAmount(form.montant) } catch (error) { return setError(error.message) }
     if (!accounts.some(a => a.id === form.banque) || !Number.isFinite(Date.parse(form.date))) return setError("Compte, montant et date valides requis")
+    if (form.type === 'Transfert' && (!accounts.some(a => a.id === form.banqueDest) || form.banqueDest === form.banque)) return setError('Choisis un compte de destination différent.')
     setSaving(true)
     try {
       const data = {
@@ -65,8 +67,9 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
           </button>
         </div>
 
-        <div className="flex gap-2">{btnType("Entrée")}{btnType("Sortie")}</div>
+        <div className="flex gap-2">{btnType("Entrée")}{btnType("Sortie")}{btnType("Transfert")}</div>
 
+      {form.type === 'Transfert' && <label>Compte de destination<select className="w-full bg-field border border-line rounded-xl p-3" value={form.banqueDest} onChange={e => set("banqueDest", e.target.value)}><option value="">Choisir un compte</option>{accounts.filter(a => a.id !== form.banque).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>}
       <AmountInput id="Historique-montant" value={form.montant} onChange={value => set("montant", value)} />
 
         <div>
@@ -163,7 +166,7 @@ export default function Historique({ cryptoKey, onImport }) {
   const filtrées = [...transactions].reverse().filter(t => {
     if (!matchesDescription(t, search)) return false
     if (filtres.type && t.type !== filtres.type) return false
-    if (filtres.banque && t.banque !== filtres.banque) return false
+    if (filtres.banque && t.banque !== filtres.banque && !(t.type === "Transfert" && t.banqueDest === filtres.banque)) return false
     if (filtres.categorie && t.categorie !== filtres.categorie) return false
     const d = new Date(t.date)
     if (filtres.annee && d.getFullYear() !== parseInt(filtres.annee)) return false
@@ -207,7 +210,7 @@ export default function Historique({ cryptoKey, onImport }) {
             <div>
               <label className="text-xs text-muted mb-2 block">Type</label>
               <div className="flex gap-2">
-                {["Entrée", "Sortie"].map(t => (
+                {["Entrée", "Sortie", "Transfert"].map(t => (
                   <button key={t} onClick={() => setF("type", filtres.type === t ? "" : t)}
                     className={`flex-1 py-2 rounded-xl text-sm font-semibold transition ${
                       filtres.type === t ? "bg-emerald-500 text-white" : "bg-card text-muted"
@@ -311,13 +314,13 @@ export default function Historique({ cryptoKey, onImport }) {
         {filtrées.map(t => (
           <div key={t.id} className="bg-card rounded-xl px-4 py-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <span className={`text-lg font-bold shrink-0 ${t.type === "Entrée" ? "text-positive" : "text-negative"}`}>
-                {t.type === "Entrée" ? "+" : "-"}{t.montant}€
+              <span className={`text-lg font-bold shrink-0 ${t.type === "Transfert" ? "text-link" : t.type === "Entrée" ? "text-positive" : "text-negative"}`}>
+                {t.type === "Transfert" ? "↔ " : t.type === "Entrée" ? "+" : "-"}{t.montant}€
               </span>
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{t.description || "—"}</p>
                 <p className="text-xs text-muted">
-                  {accountName(t.banque)} · {t.categorie} · {new Date(t.date).toLocaleDateString("fr-FR")}
+                  {accountName(t.banque)}{t.type === "Transfert" ? ` → ${accountName(t.banqueDest)}` : ""} · {t.categorie} · {new Date(t.date).toLocaleDateString("fr-FR")}
                 </p>
               </div>
             </div>

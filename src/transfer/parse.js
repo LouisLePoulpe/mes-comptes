@@ -45,18 +45,20 @@ export function parseExport(buffer, filename) {
     if (row.every(value => value === '')) return
     const field = key => row[headers.indexOf(key)] ?? ''
     try {
-      const type = normalized(field('type')) === 'entree' ? 'Entrée' : normalized(field('type')) === 'sortie' ? 'Sortie' : null
-      if (!type) throw new Error('Type attendu : Entrée ou Sortie')
+      const type = normalized(field('type')) === 'entree' ? 'Entrée' : normalized(field('type')) === 'sortie' ? 'Sortie' : normalized(field('type')) === 'transfert' ? 'Transfert' : null
+      if (!type) throw new Error('Type attendu : Entrée, Sortie ou Transfert')
       const amountText = String(field('montant')).replace(/[\s\u00a0\u202f]/g, '').replace(',', '.')
       if (!/^\d+(?:\.\d{1,2})?$/.test(amountText)) throw new Error('Montant positif avec deux décimales maximum attendu')
       const montant = Number(amountText)
       if (!Number.isSafeInteger(Math.round(montant * 100))) throw new Error('Montant trop grand')
       const banque = String(field('banque')).trim()
       if (!banque || banque.length > 100) throw new Error('Nom de banque manquant ou trop long')
+      const banqueDest = String(field('banquedest')).trim()
+      if (type === 'Transfert' && (!banqueDest || banqueDest.length > 100 || banqueDest === banque)) throw new Error('Un transfert nécessite un compte de destination différent')
       const categorie = String(field('categorie') || 'Non classé').trim()
       const description = String(field('description')).trim()
       if (categorie.length > 200 || description.length > 2000) throw new Error('Libellé trop long')
-      records.push({ type, montant, banque, categorie: categorie || 'Non classé', description, date: importDate(field('date'), !!workbook.Workbook?.WBProps?.date1904) })
+      records.push({ type, montant, banque, ...(type === 'Transfert' ? { banqueDest } : {}), categorie: categorie || 'Non classé', description, date: importDate(field('date'), !!workbook.Workbook?.WBProps?.date1904) })
     } catch (error) { errors.push(`Ligne ${index + 2} : ${error.message}`) }
   })
   if (!records.length && !errors.length) throw new Error('Le fichier ne contient aucune transaction.')

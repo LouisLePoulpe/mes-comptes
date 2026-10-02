@@ -24,7 +24,7 @@ export default function Importer({ cryptoKey, onClose }) {
       if (file.size > 10 * 1024 * 1024) throw new Error('Le fichier dépasse 10 Mo.')
       const parsed = parseExport(await file.arrayBuffer(), file.name)
       setSource({ ...parsed, name: file.name })
-      setMapping(Object.fromEntries([...new Set(parsed.records.map(t => t.banque))].map(bank => [bank, accounts.find(a => a.id === bank || a.name === bank)?.id || '__new__'])))
+      setMapping(Object.fromEntries([...new Set(parsed.records.flatMap(t => [t.banque, t.banqueDest].filter(Boolean)))].map(bank => [bank, accounts.find(a => a.id === bank || a.name === bank)?.id || '__new__'])))
     } catch (error) { setError(error.message || 'Fichier illisible.') }
     finally { guard.current = false; setBusy(false) }
   }
@@ -33,7 +33,7 @@ export default function Importer({ cryptoKey, onClose }) {
     guard.current = true; setBusy(true); setError(''); setComparison(null)
     try {
       const resolved = Object.fromEntries(await Promise.all(Object.entries(mapping).map(async ([bank, id]) => [bank, id === '__new__' ? `import_${await digest(bank)}` : id])))
-      setComparison({ ...compareHistory(source.records.map(row => ({ ...row, banque: resolved[row.banque] })), transactions), checkedTransactions: transactions })
+      setComparison({ ...compareHistory(source.records.map(row => ({ ...row, banque: resolved[row.banque], ...(row.type === 'Transfert' ? { banqueDest: resolved[row.banqueDest] } : {}) })), transactions), checkedTransactions: transactions })
     } catch { setError('Comparaison impossible. Réessaie après le chargement de l’historique.') }
     finally { guard.current = false; setBusy(false) }
   }

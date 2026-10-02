@@ -1,6 +1,6 @@
 {
   "appId": "fr.louislepoulpe.mescomptes",
-  "appName": "Mes Comptes",
+  "appName": "Poulpécule",
   "webDir": "dist",
   "android": {
     "allowMixedContent": false,

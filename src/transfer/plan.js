@@ -2,18 +2,22 @@ export async function digest(value) {
   const bytes = new TextEncoder().encode(value)
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), byte => byte.toString(16).padStart(2, '0')).join('')
 }
-const fingerprint = t => JSON.stringify([t.type, Math.round(t.montant * 100), t.banque, t.categorie.trim(), (t.description || '').trim(), t.date.slice(0, 10)])
+const fingerprint = t => JSON.stringify([t.type, Math.round(t.montant * 100), t.banque, t.categorie.trim(), (t.description || '').trim(), t.date.slice(0, 10), ...(t.type === 'Transfert' ? [t.banqueDest] : [])])
 export async function planImport(records, mapping, existing, accounts, categories) {
   const accountWrites = new Map(), categoryWrites = new Map(), seen = new Map()
   const candidates = []
-  for (const record of records) {
-    let accountId = mapping[record.banque]
-    if (!accountId) throw new Error(`Choisis un compte pour ${record.banque}.`)
+  async function resolveAccount(bank) {
+    let accountId = mapping[bank]
+    if (!accountId) throw new Error(`Choisis un compte pour ${bank}.`)
     if (accountId === '__new__') {
-      accountId = `import_${await digest(record.banque)}`
-      if (!accounts.some(a => a.id === accountId)) accountWrites.set(accountId, { name: record.banque, color: '#2563eb' })
+      accountId = `import_${await digest(bank)}`
+      if (!accounts.some(a => a.id === accountId)) accountWrites.set(accountId, { name: bank, color: '#3e9950' })
     } else if (!accounts.some(a => a.id === accountId)) throw new Error('Un compte de destination a changé. Recommence l’aperçu.')
-    const data = { ...record, banque: accountId }
+    return accountId
+  }
+  for (const record of records) {
+    const data = { ...record, banque: await resolveAccount(record.banque), ...(record.type === 'Transfert' ? { banqueDest: await resolveAccount(record.banqueDest) } : {}) }
+    if (data.type === 'Transfert' && data.banque === data.banqueDest) throw new Error('Les comptes de départ et de destination doivent être différents.')
     const key = fingerprint(data)
     const occurrence = (seen.get(key) || 0) + 1
     seen.set(key, occurrence)
@@ -34,6 +38,6 @@ export async function planImport(records, mapping, existing, accounts, categorie
     writes.push({ id, data })
     if (!categories.some(c => c.nom === data.categorie)) categoryWrites.set(`import_${await digest(data.categorie)}`, { nom: data.categorie })
   }
-  const usedAccounts = new Set(writes.map(row => row.data.banque))
+  const usedAccounts = new Set(writes.flatMap(row => [row.data.banque, row.data.banqueDest].filter(Boolean)))
   return { transactions: writes, accounts: [...accountWrites].filter(([id]) => usedAccounts.has(id)).map(([id, data]) => ({ id, data })), categories: [...categoryWrites].map(([id, data]) => ({ id, data })), skipped }
 }

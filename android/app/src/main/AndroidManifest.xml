@@ -3,9 +3,9 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@drawable/mes_comptes_icon"
+        android:icon="@drawable/poulpecule"
         android:label="@string/app_name"
-        android:roundIcon="@drawable/mes_comptes_icon"
+        android:roundIcon="@drawable/poulpecule"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 

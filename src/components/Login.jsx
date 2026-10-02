@@ -1,3 +1,4 @@
+import Brand from "./Brand"
 import { Capacitor } from '@capacitor/core'
 import { useState } from 'react'
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth'
@@ -42,7 +43,7 @@ export default function Login() {
   }
   return <main className="min-h-screen bg-app text-foreground flex items-center justify-center px-4 py-20">
     <section className="w-full max-w-md space-y-5">
-      <h1 className="text-3xl font-bold text-positive">💰 Mes Comptes</h1>
+      <h1 className="text-3xl font-bold text-positive"><Brand /></h1>
       <h2 className="text-xl">{mode === 'signup' ? 'Créer un compte' : mode === 'reset' ? 'Mot de passe oublié' : 'Connexion'}</h2>
       <p className="text-muted">Utilise ton adresse e-mail habituelle, quel que soit ton fournisseur.</p>
       <form onSubmit={submit} className="space-y-4">

@@ -7,7 +7,7 @@ import { encrypt } from '../crypto'
 export default function Accounts({ cryptoKey }) {
   const { uid, accounts } = useData()
   const [name, setName] = useState('')
-  const [color, setColor] = useState('#60a5fa')
+  const [color, setColor] = useState('#3e9950')
   const [editing, setEditing] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)

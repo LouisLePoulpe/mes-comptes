@@ -12,11 +12,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'Mes Comptes',
-        short_name: 'Comptes',
+        name: 'Poulpécule',
+        short_name: 'Poulpécule',
         description: 'Suivi de mes finances personnelles',
-        theme_color: '#111827',
-        background_color: '#111827',
+        theme_color: '#071c14',
+        background_color: '#071c14',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/mes-comptes/',
@@ -24,17 +24,17 @@ export default defineConfig({
         icons: [
           {
             src: 'pwa-192.png',
-            sizes: '192x192',
+            sizes: '1254x1254',
             type: 'image/png'
           },
           {
             src: 'pwa-512.png',
-            sizes: '512x512',
+            sizes: '1254x1254',
             type: 'image/png'
           },
           {
             src: 'pwa-512.png',
-            sizes: '512x512',
+            sizes: '1254x1254',
             type: 'image/png',
             purpose: 'any maskable'
           }

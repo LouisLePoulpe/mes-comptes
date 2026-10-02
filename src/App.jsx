@@ -10,7 +10,7 @@ import { logoutGoogle } from "./nativeAuth"
 import Login, { VerifyEmail } from "./components/Login"
 import Importer from "./pages/Importer"
 import DataProvider from "./data/DataProvider"
-import ThemeToggle from "./components/ThemeToggle"
+import Brand from "./components/Brand"
 import Settings from "./pages/Settings"
 import Accounts from "./pages/Accounts"
 import Dashboard from "./pages/Dashboard"
@@ -19,10 +19,10 @@ import Ajouter from "./pages/Ajouter"
 import Categories from "./pages/Categories"
 import Setup from "./pages/Setup"
 import Unlock from "./pages/Unlock"
-import { LayoutDashboard, History, PlusCircle, Tags, LogOut, Settings as SettingsIcon } from "lucide-react"
+import { LayoutDashboard, History, PlusCircle, LogOut, Settings as SettingsIcon } from "lucide-react"
 
 export default function App() {
-  return <><div className="fixed top-3 left-3 z-[250]"><ThemeToggle /></div><Application /></>
+  return <Application />
 }
 
 function Application() {
@@ -121,15 +121,13 @@ function Application() {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "historique", label: "Historique", icon: History },
     { id: "ajouter", label: "Ajouter", icon: PlusCircle },
-    { id: "accounts", label: "Comptes", icon: Tags },
-    { id: "categories", label: "Catégories", icon: Tags },
     { id: "settings", label: "Paramètres", icon: SettingsIcon },
   ]
 
   return (
     <div className="min-h-screen bg-app text-foreground flex flex-col">
-      <header className="bg-panel border-b border-line pl-16 pr-4 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-positive">💰 Mes Comptes</h1>
+      <header className="bg-panel border-b border-line px-5 py-3 flex items-center justify-between">
+        <h1 className="text-xl font-bold text-positive"><Brand /></h1>
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted hidden sm:block">{user.displayName || user.email}</span>
           <button aria-label="Se déconnecter" onClick={logout} className="text-muted hover:text-foreground transition">
@@ -139,13 +137,14 @@ function Application() {
       </header>
 
       <DataProvider key={user.uid} uid={user.uid} cryptoKey={cryptoKey}>
-      <main className="flex-1 overflow-auto p-4 pb-20">
+      <main className="app-content flex-1 p-4 pb-20">
+        {["accounts", "categories"].includes(page) && <button className="settings-back" onClick={() => setPage("settings")}>← Paramètres</button>}
         {page === "dashboard" && <Dashboard cryptoKey={cryptoKey} />}
         {page === "historique" && <Historique cryptoKey={cryptoKey} onImport={() => setPage("import")} />}
         {page === "ajouter" && <Ajouter cryptoKey={cryptoKey} onSuccess={() => setPage("historique")} />}
         {page === "categories" && <Categories cryptoKey={cryptoKey} />}
         {page === "import" && <Importer cryptoKey={cryptoKey} onClose={() => setPage("historique")} />}
-        {page === "settings" && <Settings user={user} onImport={() => setPage("import")} />}
+        {page === "settings" && <Settings user={user} onAccounts={() => setPage("accounts")} onCategories={() => setPage("categories")} onImport={() => setPage("import")} />}
         {page === "accounts" && <Accounts cryptoKey={cryptoKey} />}
       </main>
       </DataProvider>
@@ -156,7 +155,7 @@ function Application() {
             key={id}
             onClick={() => setPage(id)}
             className={`flex flex-col items-center gap-1 px-1 sm:px-3 py-1 rounded-lg transition text-xs ${
-              page === id ? "text-positive" : "text-muted hover:text-muted"
+              (page === id || (id === "settings" && ["accounts", "categories"].includes(page))) ? "text-positive" : "text-muted hover:text-muted"
             }`}
           >
             <Icon size={22} />
