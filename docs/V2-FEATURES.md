@@ -25,3 +25,9 @@ Without transaction IDs in the V1 Excel format, an identical new real-world tran
 No quota-based cap of ten users is enforced; ten is the intended audience, not a Firebase authorization rule. Firestore reads/storage must still be observed with actual usage. Historical data is kept intact.
 
 The import reader uses the [official SheetJS distribution](https://docs.sheetjs.com/docs/getting-started/installation/nodejs/), since the registry version previously used by the app was older. Other existing dependency audit alerts are not all resolved by this change.
+
+## Email accounts
+
+Email/password signup, sign-in, address verification and password-reset requests work with any email provider. Verification precedes vault setup. Existing Google sign-in remains available. Account passwords and vault passphrases are separate; resetting the former does not recover the latter. Firebase's hosted action page handles verification/reset links, then the user returns to the app. Enable the Email/Password provider in Firebase Console before release, configure password policy (at least 12 characters), French mail templates, authorized domains and email enumeration protection. Test actual message delivery before inviting users. Production activation is not performed by the code change.
+
+For an existing Google account, use its same address and “Mot de passe oublié” to establish email/password access; do not create another user or move records based only on a typed email address. The automated emulator test checks that this flow keeps the same uid. Confirm this once in the release acceptance environment as well.

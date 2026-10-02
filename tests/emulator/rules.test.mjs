@@ -30,3 +30,20 @@ test('every V2 collection is owner-only, including keys, list queries and writes
     }
   } finally { await env.cleanup() }
 })
+
+
+test('password accounts need a verified address for server access', async () => {
+  const env = await initializeTestEnvironment({ projectId: 'demo-mes-comptes-v2', firestore: { host: '127.0.0.1', port: 8080, rules: await readFile('firestore.v2.rules', 'utf8') } })
+  try {
+    const pending = env.authenticatedContext('email-owner', { email_verified: false, firebase: { sign_in_provider: 'password' } }).firestore()
+    const verified = env.authenticatedContext('email-owner', { email_verified: true, firebase: { sign_in_provider: 'password' } }).firestore()
+    for (const group of ['transactions', 'categories', 'accounts', 'config']) {
+      const path = `users/email-owner/${group}/one`
+      await assertFails(setDoc(doc(pending, path), { encrypted: 'fixture' }))
+      await assertSucceeds(setDoc(doc(verified, path), { encrypted: 'fixture' }))
+      await assertFails(getDoc(doc(pending, path)))
+      await assertFails(getDocs(collection(pending, `users/email-owner/${group}`)))
+      await assertSucceeds(getDoc(doc(verified, path)))
+    }
+  } finally { await env.cleanup() }
+})

@@ -33,3 +33,9 @@ Requires Java 21 and Android SDK 36. The GitHub workflow **Android preview APK**
 Physical Android acceptance remains required: install/update signed APK, Google login/logout, theme/keyboard/back button, file picker import, save to Downloads, cancelled save, share to a chosen app, open Excel externally, and reload full history. Browser tests simulate file-sharing success/cancellation/failure; they do not validate Android's operating-system dialogs.
 
 References: [Capacitor Android](https://capacitorjs.com/docs/android), [native authentication](https://capawesome.io/docs/sdks/capacitor/firebase/authentication/), [Google setup](https://github.com/capawesome-team/capacitor-firebase/blob/main/packages/authentication/docs/setup-google.md), [Capacitor Share](https://capacitorjs.com/docs/apis/share).
+
+## Email authentication build
+
+V2 also supports email/password accounts from any email provider, verification and password reset. These use Firebase's JavaScript SDK in both web and Android. The vault passphrase is separate; a password reset does not decrypt the vault.
+
+After the coordinated production cutover, `npm run android:sync -- --production --email-only` builds against production Firebase without the native Google plugin or `google-services.json`. Google login is unavailable in this variant. Enable Email/Password in Firebase Authentication first and test email delivery and the app's WebView origin on a physical device. This option does not deploy rules or migrate any data. A stable signed release APK is still required for distribution. The default preview continues to use local emulators; it is not connected to production.

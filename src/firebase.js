@@ -15,6 +15,7 @@ const useProduction = import.meta.env.VITE_V2_USE_PRODUCTION === 'true';
 const app = initializeApp(useProduction ? firebaseConfig : { ...firebaseConfig, projectId: 'demo-mes-comptes-v2' });
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+auth.languageCode = "fr";
 export const googleProvider = new GoogleAuthProvider();
 
 // V2 preview defaults to local emulators. Production requires an explicit build opt-in.

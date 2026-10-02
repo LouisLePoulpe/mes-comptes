@@ -2,11 +2,12 @@ import { App as NativeApp } from "@capacitor/app"
 import { Capacitor } from "@capacitor/core"
 import { useState, useEffect } from "react"
 import { auth } from "./firebase"
-import { onAuthStateChanged } from "firebase/auth"
+import { onIdTokenChanged } from "firebase/auth"
 import { getDoc } from "firebase/firestore"
 import { loadKeyLocally, clearKeyLocally, decrypt } from "./crypto"
 import { userDoc } from "./data/references"
-import { loginGoogle, logoutGoogle } from "./nativeAuth"
+import { logoutGoogle } from "./nativeAuth"
+import Login, { VerifyEmail } from "./components/Login"
 import Importer from "./pages/Importer"
 import DataProvider from "./data/DataProvider"
 import ThemeToggle from "./components/ThemeToggle"
@@ -42,7 +43,7 @@ function Application() {
 
   useEffect(() => {
     let generation = 0
-    const unsub = onAuthStateChanged(auth, async (u) => {
+    const unsub = onIdTokenChanged(auth, async (u) => {
       const current = ++generation
       setUser(u)
       setCryptoKey(null)
@@ -51,7 +52,7 @@ function Application() {
       setPage("dashboard")
       setLoading(true)
       try {
-        if (u) {
+        if (u && !(u.providerData.some(provider => provider.providerId === "password") && !u.emailVerified)) {
           const config = await getDoc(userDoc(u.uid, "config", "crypto"))
           let key = null
           if (config.exists()) {
@@ -81,11 +82,6 @@ function Application() {
     setCryptoState("ready")
   }
 
-  const login = async () => {
-    setError("")
-    try { await loginGoogle() }
-    catch (error) { setError(error.message?.includes("préversion Android") ? error.message : "Connexion annulée ou impossible. Tu peux réessayer.") }
-  }
   const logout = () => {
     clearKeyLocally(user.uid)
     setCryptoKey(null)
@@ -99,19 +95,9 @@ function Application() {
     </div>
   )
 
-  if (!user) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-app text-foreground gap-6">
-      <h1 className="text-4xl font-bold text-positive">💰 Mes Comptes</h1>
-      <p className="text-muted">Connecte-toi pour accéder à tes finances</p>
-      {error && <p role="alert">{error}</p>}
-      <button
-        onClick={login}
-        className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-8 py-3 rounded-xl transition"
-      >
-        Se connecter avec Google
-      </button>
-    </div>
-  )
+  if (!user) return <Login />
+  if (user.providerData.some(provider => provider.providerId === "password") && !user.emailVerified)
+    return <VerifyEmail user={user} onLogout={logout} />
 
   if (error) return <div role="alert">{error}<button aria-label="Se déconnecter" onClick={logout}>Se déconnecter</button></div>
 
@@ -143,7 +129,7 @@ function Application() {
       <header className="bg-panel border-b border-line pl-16 pr-4 py-3 flex items-center justify-between">
         <h1 className="text-xl font-bold text-positive">💰 Mes Comptes</h1>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-muted hidden sm:block">{user.displayName}</span>
+          <span className="text-sm text-muted hidden sm:block">{user.displayName || user.email}</span>
           <button aria-label="Se déconnecter" onClick={logout} className="text-muted hover:text-foreground transition">
             <LogOut size={20} />
           </button>
