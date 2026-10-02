@@ -1,10 +1,15 @@
+import { App as NativeApp } from "@capacitor/app"
+import { Capacitor } from "@capacitor/core"
 import { useState, useEffect } from "react"
-import { auth, googleProvider } from "./firebase"
-import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth"
+import { auth } from "./firebase"
+import { onAuthStateChanged } from "firebase/auth"
 import { getDoc } from "firebase/firestore"
 import { loadKeyLocally, clearKeyLocally, decrypt } from "./crypto"
 import { userDoc } from "./data/references"
+import { loginGoogle, logoutGoogle } from "./nativeAuth"
+import Importer from "./pages/Importer"
 import DataProvider from "./data/DataProvider"
+import ThemeToggle from "./components/ThemeToggle"
 import Accounts from "./pages/Accounts"
 import Dashboard from "./pages/Dashboard"
 import Historique from "./pages/Historique"
@@ -15,6 +20,10 @@ import Unlock from "./pages/Unlock"
 import { LayoutDashboard, History, PlusCircle, Tags, LogOut } from "lucide-react"
 
 export default function App() {
+  return <><div className="fixed top-3 left-3 z-[250]"><ThemeToggle /></div><Application /></>
+}
+
+function Application() {
   const [user, setUser] = useState(null)
   const [page, setPage] = useState("dashboard")
   const [loading, setLoading] = useState(true)
@@ -22,6 +31,15 @@ export default function App() {
   const [cryptoState, setCryptoState] = useState("checking") // "checking" | "setup" | "unlock" | "ready"
 
   const [error, setError] = useState("")
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    const handle = NativeApp.addListener('backButton', () => {
+      if (page !== 'dashboard') setPage('dashboard')
+      else NativeApp.minimizeApp()
+    })
+    return () => { handle.then(listener => listener.remove()) }
+  }, [page])
+
   useEffect(() => {
     let generation = 0
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -65,26 +83,26 @@ export default function App() {
 
   const login = async () => {
     setError("")
-    try { await signInWithPopup(auth, googleProvider) }
-    catch { setError("Connexion annulée ou impossible. Tu peux réessayer.") }
+    try { await loginGoogle() }
+    catch (error) { setError(error.message?.includes("préversion Android") ? error.message : "Connexion annulée ou impossible. Tu peux réessayer.") }
   }
   const logout = () => {
     clearKeyLocally(user.uid)
     setCryptoKey(null)
     setCryptoState("checking")
-    signOut(auth)
+    logoutGoogle().catch(() => setError("Déconnexion incomplète. Réessaie."))
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
+    <div className="min-h-screen flex items-center justify-center bg-app text-foreground">
       Chargement...
     </div>
   )
 
   if (!user) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 text-white gap-6">
-      <h1 className="text-4xl font-bold text-emerald-400">💰 Mes Comptes</h1>
-      <p className="text-gray-400">Connecte-toi pour accéder à tes finances</p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-app text-foreground gap-6">
+      <h1 className="text-4xl font-bold text-positive">💰 Mes Comptes</h1>
+      <p className="text-muted">Connecte-toi pour accéder à tes finances</p>
       {error && <p role="alert">{error}</p>}
       <button
         onClick={login}
@@ -98,14 +116,14 @@ export default function App() {
   if (error) return <div role="alert">{error}<button aria-label="Se déconnecter" onClick={logout}>Se déconnecter</button></div>
 
   if (cryptoState === "checking") return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
+    <div className="min-h-screen flex items-center justify-center bg-app text-foreground">
       Vérification du chiffrement...
     </div>
   )
 
   if (cryptoState === "setup" || cryptoState === "unlock") return (
     <>
-      <button onClick={logout} className="fixed top-4 right-4 text-white z-10">Se déconnecter</button>
+      <button onClick={logout} className="fixed top-4 right-4 text-foreground z-10">Se déconnecter</button>
       {cryptoState === "setup"
         ? <Setup key={user.uid} uid={user.uid} onComplete={handleComplete} />
         : <Unlock key={user.uid} uid={user.uid} onComplete={handleComplete} />}
@@ -121,12 +139,12 @@ export default function App() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-emerald-400">💰 Mes Comptes</h1>
+    <div className="min-h-screen bg-app text-foreground flex flex-col">
+      <header className="bg-panel border-b border-line pl-16 pr-4 py-3 flex items-center justify-between">
+        <h1 className="text-xl font-bold text-positive">💰 Mes Comptes</h1>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-400 hidden sm:block">{user.displayName}</span>
-          <button aria-label="Se déconnecter" onClick={logout} className="text-gray-400 hover:text-white transition">
+          <span className="text-sm text-muted hidden sm:block">{user.displayName}</span>
+          <button aria-label="Se déconnecter" onClick={logout} className="text-muted hover:text-foreground transition">
             <LogOut size={20} />
           </button>
         </div>
@@ -135,20 +153,21 @@ export default function App() {
       <DataProvider key={user.uid} uid={user.uid} cryptoKey={cryptoKey}>
       <main className="flex-1 overflow-auto p-4 pb-20">
         {page === "dashboard" && <Dashboard cryptoKey={cryptoKey} />}
-        {page === "historique" && <Historique cryptoKey={cryptoKey} />}
+        {page === "historique" && <Historique cryptoKey={cryptoKey} onImport={() => setPage("import")} />}
         {page === "ajouter" && <Ajouter cryptoKey={cryptoKey} onSuccess={() => setPage("historique")} />}
         {page === "categories" && <Categories cryptoKey={cryptoKey} />}
+        {page === "import" && <Importer cryptoKey={cryptoKey} onClose={() => setPage("historique")} />}
         {page === "accounts" && <Accounts cryptoKey={cryptoKey} />}
       </main>
       </DataProvider>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 flex justify-around py-2 z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-panel border-t border-line flex justify-around py-2 z-50">
         {nav.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setPage(id)}
             className={`flex flex-col items-center gap-1 px-3 py-1 rounded-lg transition text-xs ${
-              page === id ? "text-emerald-400" : "text-gray-500 hover:text-gray-300"
+              page === id ? "text-positive" : "text-muted hover:text-muted"
             }`}
           >
             <Icon size={22} />

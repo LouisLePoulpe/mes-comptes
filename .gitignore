@@ -32,3 +32,8 @@ import-comptes/serviceAccount.json.json
 # Browser test artifacts (synthetic fixtures only)
 /test-results/
 /playwright-report/
+
+# Android Firebase config and private signing keys
+android/app/google-services.json
+*.jks
+*.keystore

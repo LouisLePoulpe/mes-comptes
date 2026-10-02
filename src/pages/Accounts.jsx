@@ -28,13 +28,13 @@ export default function Accounts({ cryptoKey }) {
     <h2 className="text-2xl font-bold">Mes comptes</h2>
     <p>Les noms et couleurs peuvent changer sans modifier l’historique.</p>
     <form onSubmit={save} className="flex flex-wrap gap-2">
-      <input aria-label="Nom du compte" required maxLength={100} value={name} onChange={e => setName(e.target.value)} className="bg-gray-800 rounded p-2" placeholder="Nom du compte" />
+      <input aria-label="Nom du compte" required maxLength={100} value={name} onChange={e => setName(e.target.value)} className="bg-card rounded p-2" placeholder="Nom du compte" />
       <input aria-label="Couleur du compte" type="color" value={color} onChange={e => setColor(e.target.value)} />
       <button disabled={busy} className="bg-emerald-600 rounded p-2">{editing ? 'Enregistrer' : 'Ajouter'}</button>
       {editing && <button type="button" onClick={() => { setEditing(null); setName('') }}>Annuler</button>}
     </form>
     {error && <p role="alert">{error}</p>}
-    {accounts.map(account => <div key={account.id} className="bg-gray-800 p-3 rounded flex justify-between">
+    {accounts.map(account => <div key={account.id} className="bg-card p-3 rounded flex justify-between">
       <span style={{ color: account.color }}>{account.name}</span>
       <button disabled={busy} onClick={() => { setEditing(account.id); setName(account.name); setColor(account.color) }}>Modifier</button>
     </div>)}

@@ -4,3 +4,39 @@
   pointer-events: none;
   bottom: 4rem !important;
 }
+
+@theme inline {
+  --color-app: var(--app);
+  --color-panel: var(--panel);
+  --color-card: var(--card);
+  --color-field: var(--field);
+  --color-hover: var(--hover);
+  --color-line: var(--line);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-link: var(--link);
+}
+:root {
+  color-scheme: dark;
+  --app: #030712; --panel: #111827; --card: #1f2937; --field: #374151;
+  --hover: #4b5563; --line: #4b5563; --foreground: #f9fafb; --muted: #b0bac9;
+  --positive: #34d399; --negative: #f87171; --link: #60a5fa;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --app: #f8fafc; --panel: #ffffff; --card: #f1f5f9; --field: #e2e8f0;
+  --hover: #cbd5e1; --line: #94a3b8; --foreground: #0f172a; --muted: #475569;
+  --positive: #047857; --negative: #b91c1c; --link: #1d4ed8;
+}
+body { margin: 0; background: var(--app); color: var(--foreground); }
+button, input, select, textarea { touch-action: manipulation; }
+button { cursor: pointer; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
+
+/* Native edge-to-edge and installed mobile layout. */
+header { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+nav { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+main { padding-bottom: calc(6rem + env(safe-area-inset-bottom)); }

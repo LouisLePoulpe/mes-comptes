@@ -4,11 +4,11 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: "/mes-comptes/",
+  base: process.env.VITE_NATIVE === "true" ? "/" : "/mes-comptes/",
   plugins: [
     react(),
     tailwindcss(),
-    VitePWA({
+    ...(process.env.VITE_NATIVE === "true" ? [] : [VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
@@ -44,6 +44,6 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
 
       }
-    })
+    })])
   ],
 })

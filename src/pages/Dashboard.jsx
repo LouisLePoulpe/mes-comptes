@@ -24,8 +24,8 @@ function regression(data, key) {
 const stripEmojis = (str) => str?.replace(/[\u{1F000}-\u{1FFFF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{FE00}-\u{FE0F}|\u{1F900}-\u{1F9FF}|\u{1FA00}-\u{1FAFF}]/gu, "").trim() || ""
 
   const KPI = ({ label, value, color }) => (
-    <div className="bg-gray-800 rounded-2xl p-4">
-      <p className="text-xs text-gray-400 mb-1">{label}</p>
+    <div className="bg-card rounded-2xl p-4">
+      <p className="text-xs text-muted mb-1">{label}</p>
       <p className={`text-2xl font-bold ${color}`}>{value.toFixed(2)} €</p>
     </div>
   )
@@ -131,7 +131,7 @@ export default function Dashboard() {
         <select
           value={moisFiltre}
           onChange={e => setMoisFiltre(e.target.value)}
-          className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+          className="bg-card border border-line rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-emerald-500"
         >
           <option value="all">Tous les mois</option>
           {moisDisponibles.map(m => (
@@ -142,24 +142,24 @@ export default function Dashboard() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3">
-        {accounts.map(a => <KPI key={a.id} label={a.name} value={soldes[a.id] || 0} color="text-emerald-400" />)}
-        <KPI label="Consommation" value={totalSorties} color="text-red-400" />
+        {accounts.map(a => <KPI key={a.id} label={a.name} value={soldes[a.id] || 0} color={(soldes[a.id] || 0) < 0 ? "text-negative" : "text-positive"} />)}
+        <KPI label="Consommation" value={totalSorties} color="text-negative" />
       </div>
 
       {/* Camembert */}
       {pieData.length > 0 && (
-        <div className="bg-gray-800 rounded-2xl p-4">
-          <p className="text-sm text-gray-400 mb-3">Dépenses par catégorie</p>
+        <div className="bg-card rounded-2xl p-4">
+          <p className="text-sm text-muted mb-3">Dépenses par catégorie</p>
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={3}>
+                <Pie isAnimationActive={false} data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={3}>
                   {pieData.map((_, i) => (
                     <Cell key={i} fill={COULEURS_PIE[i % COULEURS_PIE.length]} />
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px" }}
+                  contentStyle={{ backgroundColor: "var(--card)", color: "var(--foreground)", border: "none", borderRadius: "8px" }}
                   formatter={(v) => `${v} €`}
                 />
               </PieChart>
@@ -167,10 +167,10 @@ export default function Dashboard() {
             <div className="flex flex-col gap-2 w-full">
               {pieData.map((entry, i) => {
                 const pct = entrees > 0 ? Math.round((entry.value / entrees) * 100) : 0
-                let couleur = "text-emerald-400"
-                if (entry.name.includes("Charges") && pct > 50) couleur = "text-red-400"
-                if (entry.name.includes("Plaisir")  && pct > 30) couleur = "text-red-400"
-                if (entry.name.includes("pargne")   && pct < 20) couleur = "text-red-400"
+                let couleur = "text-positive"
+                if (entry.name.includes("Charges") && pct > 50) couleur = "text-negative"
+                if (entry.name.includes("Plaisir")  && pct > 30) couleur = "text-negative"
+                if (entry.name.includes("pargne")   && pct < 20) couleur = "text-negative"
                 return (
                   <div key={entry.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -190,15 +190,15 @@ export default function Dashboard() {
 
       {/* Graphique progression */}
       {graphDataWithTrend.length > 0 && (
-        <div className="bg-gray-800 rounded-2xl p-4">
-          <p className="text-sm text-gray-400 mb-3">Progression des comptes</p>
+        <div className="bg-card rounded-2xl p-4">
+          <p className="text-sm text-muted mb-3">Progression des comptes</p>
           <div className="flex gap-2 mb-3">
             {accounts.map(({ id: key, name, color }) => (
               <button
                 key={key}
                 onClick={() => toggleCourbe(key)}
                 className={`flex items-center gap-1 px-3 py-1 rounded-lg text-sm font-semibold transition ${
-                  courbes[key] !== false ? "bg-gray-700 text-white" : "bg-gray-900 text-gray-600"
+                  courbes[key] !== false ? "bg-field text-foreground" : "bg-panel text-muted"
                 }`}
               >
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
@@ -209,10 +209,10 @@ export default function Dashboard() {
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={graphDataWithTrend}>
               <XAxis dataKey="date" hide />
-              <YAxis width={55} tick={{ fill: "#9ca3af", fontSize: 11 }} />
-              <Tooltip contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px" }} />
-              {accounts.filter(a => courbes[a.id] !== false).map(a => <Line key={a.id} name={a.name} type="monotone" dataKey={a.id} stroke={a.color} dot={false} strokeWidth={2} />)}
-              {accounts.filter(a => courbes[a.id] !== false).map(a => <Line key={`${a.id}_trend`} name={`${a.name} (tendance)`} type="monotone" dataKey={`${a.id}_trend`} stroke={a.color} dot={false} strokeWidth={1} strokeDasharray="5 5" />)}
+              <YAxis width={55} tick={{ fill: "var(--muted)", fontSize: 11 }} />
+              <Tooltip contentStyle={{ backgroundColor: "var(--card)", color: "var(--foreground)", border: "none", borderRadius: "8px" }} />
+              {accounts.filter(a => courbes[a.id] !== false).map(a => <Line isAnimationActive={false} key={a.id} name={a.name} type="monotone" dataKey={a.id} stroke={a.color} dot={false} strokeWidth={2} />)}
+              {accounts.filter(a => courbes[a.id] !== false).map(a => <Line isAnimationActive={false} key={`${a.id}_trend`} name={`${a.name} (tendance)`} type="monotone" dataKey={`${a.id}_trend`} stroke={a.color} dot={false} strokeWidth={1} strokeDasharray="5 5" />)}
             </LineChart>
           </ResponsiveContainer>
         </div>

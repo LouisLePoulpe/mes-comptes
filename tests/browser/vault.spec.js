@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
-import XLSX from 'xlsx'
+import * as XLSX from 'xlsx'
+import { readFile } from 'node:fs/promises'
 
 import { login, setup, navigate } from './helpers'
 
@@ -59,7 +60,7 @@ test('coffre, historique complet, comptes, export, récupération et changement 
   const downloaded = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export Excel' }).click()
   const download = await downloaded
-  const workbook = XLSX.readFile(await download.path())
+  const workbook = XLSX.read(await readFile(await download.path()))
   const rows = XLSX.utils.sheet_to_json(workbook.Sheets.Transactions)
   expect(rows).toHaveLength(2)
   expect(rows.map(row => row.Banque)).toEqual(['Compte renommé', 'Compte renommé'])

@@ -67,27 +67,27 @@ export default function Unlock({ uid, onComplete }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-app text-foreground flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-md flex flex-col gap-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-emerald-400 mb-2">🔐 Mes Comptes</h1>
-          <p className="text-gray-400 text-sm">Entre ta passphrase pour accéder à tes données</p>
+          <h1 className="text-3xl font-bold text-positive mb-2">🔐 Mes Comptes</h1>
+          <p className="text-muted text-sm">Entre ta passphrase pour accéder à tes données</p>
         </div>
 
-        <div className="bg-gray-800 rounded-2xl p-5 flex flex-col gap-4">
+        <div className="bg-card rounded-2xl p-5 flex flex-col gap-4">
 
           {/* Tabs */}
           <div className="flex gap-2">
             <button
               onClick={() => { setMode("passphrase"); setError("") }}
               className={`flex-1 py-2 rounded-xl text-sm font-semibold transition ${
-                mode === "passphrase" ? "bg-emerald-500 text-white" : "bg-gray-700 text-gray-400"
+                mode === "passphrase" ? "bg-emerald-500 text-white" : "bg-field text-muted"
               }`}
             >Passphrase</button>
             <button
               onClick={() => { setMode("recovery"); setError("") }}
               className={`flex-1 py-2 rounded-xl text-sm font-semibold transition ${
-                mode === "recovery" ? "bg-emerald-500 text-white" : "bg-gray-700 text-gray-400"
+                mode === "recovery" ? "bg-emerald-500 text-white" : "bg-field text-muted"
               }`}
             >Clé de récupération</button>
           </div>
@@ -95,7 +95,7 @@ export default function Unlock({ uid, onComplete }) {
           {mode === "passphrase" ? (
             <>
               <div>
-                <label htmlFor="Unlock-passphrase" className="text-sm text-gray-400 mb-1 block">Passphrase</label>
+                <label htmlFor="Unlock-passphrase" className="text-sm text-muted mb-1 block">Passphrase</label>
                 <div className="relative">
                   <input
                     type={show ? "text" : "password"}
@@ -104,15 +104,15 @@ export default function Unlock({ uid, onComplete }) {
                     onChange={e => setPassphrase(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && handleUnlock()}
                     placeholder="Ta passphrase..."
-                    className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 pr-12"
+                    className="w-full bg-field border border-line rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-emerald-500 pr-12"
                   />
-                  <button aria-label={show ? "Masquer la passphrase" : "Afficher la passphrase"} onClick={() => setShow(s => !s)} className="absolute right-3 top-3 text-gray-400">
+                  <button aria-label={show ? "Masquer la passphrase" : "Afficher la passphrase"} onClick={() => setShow(s => !s)} className="absolute right-3 top-3 text-muted">
                     {show ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
               </div>
 
-              {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
+              {error && <p role="alert" className="text-negative text-sm">{error}</p>}
 
               <button
                 onClick={handleUnlock}
@@ -125,18 +125,18 @@ export default function Unlock({ uid, onComplete }) {
           ) : (
             <>
               <div>
-                <label htmlFor="Unlock-recoveryKey" className="text-sm text-gray-400 mb-1 block">Clé de récupération (24 mots)</label>
+                <label htmlFor="Unlock-recoveryKey" className="text-sm text-muted mb-1 block">Clé de récupération (24 mots)</label>
                 <textarea
                   id="Unlock-recoveryKey"
                   value={recoveryKey}
                   onChange={e => setRecoveryKey(e.target.value)}
                   placeholder="mot1-mot2-mot3-..."
                   rows={4}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 font-mono text-sm"
+                  className="w-full bg-field border border-line rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-emerald-500 font-mono text-sm"
                 />
               </div>
 
-              {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
+              {error && <p role="alert" className="text-negative text-sm">{error}</p>}
 
               <button
                 onClick={handleRecovery}
