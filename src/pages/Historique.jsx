@@ -1,11 +1,13 @@
-import { useState, useEffect } from "react"
-import { db } from "../firebase"
-import { collection, onSnapshot, deleteDoc, doc, query, updateDoc } from "firebase/firestore"
-import { encrypt, decrypt } from "../crypto"
+import { useState } from "react"
+import { userDoc } from "../data/references"
+import { useData } from "../data/context"
+import { deleteDoc, updateDoc } from "firebase/firestore"
+import { encrypt } from "../crypto"
 import { Trash2, Pencil, X, Filter } from "lucide-react"
 import * as XLSX from "xlsx"
 
 function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
+  const { uid, accounts } = useData()
   const [form, setForm] = useState({
     type: transaction.type,
     montant: transaction.montant,
@@ -18,14 +20,17 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const sauvegarder = async () => {
+    if (!accounts.some(a => a.id === form.banque) || !Number.isFinite(Number(form.montant)) || Number(form.montant) <= 0 || !form.date) return alert("Compte, montant et date valides requis")
+    try {
     const data = {
       ...form,
       montant: parseFloat(form.montant),
       date: new Date(form.date).toISOString()
     }
     const encrypted = await encrypt(data, cryptoKey)
-    await updateDoc(doc(db, "transactions", transaction.id), encrypted)
+    await updateDoc(userDoc(uid, "transactions", transaction.id), encrypted)
     onSave()
+    } catch { alert("Modification impossible. Réessaie.") }
   }
 
   const btnType = (t) => (
@@ -64,14 +69,14 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
         <div>
           <label className="text-sm text-gray-400 mb-1 block">Banque</label>
           <div className="flex gap-2">
-            {["BB", "CMB", "TR"].map(b => (
+            {accounts.map(({ id: b, name }) => (
               <button
                 key={b}
                 onClick={() => set("banque", b)}
                 className={`flex-1 py-2 rounded-xl font-semibold transition ${
                   form.banque === b ? "bg-blue-500 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"
                 }`}
-              >{b}</button>
+              >{name}</button>
             ))}
           </div>
         </div>
@@ -123,46 +128,16 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
 const MOIS_NOMS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"]
 
 export default function Historique({ cryptoKey }) {
-  const [transactions, setTransactions] = useState([])
-  const [categories, setCategories] = useState([])
+  const { uid, transactions, categories, accounts, accountName } = useData()
   const [filtres, setFiltres] = useState({ banque: "", categorie: "", type: "", mois: "", annee: "" })
   const [enEdition, setEnEdition] = useState(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  useEffect(() => {
-    const q = query(collection(db, "transactions"))
-    const unsub = onSnapshot(q, async (snap) => {
-      const decrypted = await Promise.all(snap.docs.map(async d => {
-        try {
-          const data = await decrypt(d.data(), cryptoKey)
-          return { id: d.id, ...data }
-        } catch {
-          return null
-        }
-      }))
-      setTransactions(decrypted.filter(Boolean).sort((a,b) => new Date(b.date) - new Date(a.date)))
-    })
-    return unsub
-  }, [cryptoKey])
 
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "categories"), async (snap) => {
-      const decrypted = await Promise.all(snap.docs.map(async d => {
-        try {
-          const data = await decrypt(d.data(), cryptoKey)
-          return { id: d.id, ...data }
-        } catch {
-          return null
-        }
-      }))
-      setCategories(decrypted.filter(Boolean))
-    })
-    return unsub
-  }, [cryptoKey])
 
   const supprimer = async (id) => {
     if (confirm("Supprimer cette transaction ?")) {
-      await deleteDoc(doc(db, "transactions", id))
+      await deleteDoc(userDoc(uid, "transactions", id))
     }
   }
 
@@ -170,7 +145,7 @@ export default function Historique({ cryptoKey }) {
     const data = transactions.map(t => ({
       Type: t.type,
       Montant: t.montant,
-      Banque: t.banque,
+      Banque: accountName(t.banque),
       Catégorie: t.categorie,
       Description: t.description,
       Date: new Date(t.date).toLocaleDateString("fr-FR")
@@ -189,7 +164,7 @@ export default function Historique({ cryptoKey }) {
     .filter(Boolean)
   )].sort((a,b) => b - a)
 
-  const filtrées = transactions.filter(t => {
+  const filtrées = [...transactions].reverse().filter(t => {
     if (filtres.type && t.type !== filtres.type) return false
     if (filtres.banque && t.banque !== filtres.banque) return false
     if (filtres.categorie && t.categorie !== filtres.categorie) return false
@@ -247,11 +222,11 @@ export default function Historique({ cryptoKey }) {
             <div>
               <label className="text-xs text-gray-400 mb-2 block">Banque</label>
               <div className="flex gap-2">
-                {["BB", "CMB", "TR"].map(b => (
+                {accounts.map(({ id: b, name }) => (
                   <button key={b} onClick={() => setF("banque", filtres.banque === b ? "" : b)}
                     className={`flex-1 py-2 rounded-xl text-sm font-semibold transition ${
                       filtres.banque === b ? "bg-blue-500 text-white" : "bg-gray-800 text-gray-400"
-                    }`}>{b}</button>
+                    }`}>{name}</button>
                 ))}
               </div>
             </div>
@@ -341,7 +316,7 @@ export default function Historique({ cryptoKey }) {
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{t.description || "—"}</p>
                 <p className="text-xs text-gray-500">
-                  {t.banque} · {t.categorie} · {new Date(t.date).toLocaleDateString("fr-FR")}
+                  {accountName(t.banque)} · {t.categorie} · {new Date(t.date).toLocaleDateString("fr-FR")}
                 </p>
               </div>
             </div>

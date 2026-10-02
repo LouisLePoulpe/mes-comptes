@@ -1,49 +1,38 @@
-import { useState, useEffect } from "react"
-import { db } from "../firebase"
-import { collection, addDoc, onSnapshot, Timestamp } from "firebase/firestore"
-import { encrypt, decrypt } from "../crypto"
+import { useState } from "react"
+import { userCollection } from "../data/references"
+import { useData } from "../data/context"
+import { addDoc } from "firebase/firestore"
+import { encrypt } from "../crypto"
 
 export default function Ajouter({ cryptoKey, onSuccess }) {
+  const { uid, categories, accounts } = useData()
   const [form, setForm] = useState({
     type: "Sortie",
     montant: "",
-    banque: "BB",
+    banque: accounts[0]?.id || "",
     categorie: "",
     description: "",
     date: new Date().toISOString().split("T")[0]
   })
-  const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "categories"), async (snap) => {
-      const decrypted = await Promise.all(snap.docs.map(async d => {
-        try {
-          const data = await decrypt(d.data(), cryptoKey)
-          return { id: d.id, ...data }
-        } catch {
-          return null
-        }
-      }))
-      setCategories(decrypted.filter(Boolean))
-    })
-    return unsub
-  }, [cryptoKey])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const submit = async () => {
-    if (!form.montant || !form.categorie) return alert("Montant et catégorie requis")
+    if (!accounts.some(a => a.id === form.banque) || !Number.isFinite(Number(form.montant)) || Number(form.montant) <= 0 || !form.date || !form.categorie) return alert("Montant et catégorie requis")
     setLoading(true)
+    try {
     const data = {
       ...form,
       montant: parseFloat(form.montant),
       date: new Date(form.date).toISOString()
     }
     const encrypted = await encrypt(data, cryptoKey)
-    await addDoc(collection(db, "transactions"), encrypted)
-    setLoading(false)
+    await addDoc(userCollection(uid, "transactions"), encrypted)
     onSuccess()
+    } catch { alert("Enregistrement impossible. Réessaie.") }
+    finally { setLoading(false) }
   }
 
   const btnType = (t) => (
@@ -77,14 +66,14 @@ export default function Ajouter({ cryptoKey, onSuccess }) {
       <div>
         <label className="text-sm text-gray-400 mb-1 block">Banque</label>
         <div className="flex gap-2">
-          {["BB", "CMB", "TR"].map(b => (
+          {accounts.map(({ id: b, name }) => (
             <button
               key={b}
               onClick={() => set("banque", b)}
               className={`flex-1 py-2 rounded-xl font-semibold transition ${
                 form.banque === b ? "bg-blue-500 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"
               }`}
-            >{b}</button>
+            >{name}</button>
           ))}
         </div>
       </div>

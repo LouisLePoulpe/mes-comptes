@@ -1,41 +1,28 @@
-import { useState, useEffect } from "react"
-import { db } from "../firebase"
-import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDocs } from "firebase/firestore"
-import { encrypt, decrypt } from "../crypto"
+import { useState } from "react"
+import { userCollection, userDoc } from "../data/references"
+import { useData } from "../data/context"
+import { addDoc, deleteDoc, updateDoc } from "firebase/firestore"
+import { encrypt } from "../crypto"
 import { Plus, Trash2, Pencil, Check, X } from "lucide-react"
 
 export default function Categories({ cryptoKey }) {
-  const [categories, setCategories] = useState([])
+  const { uid, transactions, categories } = useData()
   const [nouvelle, setNouvelle] = useState("")
   const [enEdition, setEnEdition] = useState(null)
   const [nouveauNom, setNouveauNom] = useState("")
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "categories"), async (snap) => {
-      const decrypted = await Promise.all(snap.docs.map(async d => {
-        try {
-          const data = await decrypt(d.data(), cryptoKey)
-          return { id: d.id, ...data }
-        } catch {
-          return null
-        }
-      }))
-      setCategories(decrypted.filter(Boolean))
-    })
-    return unsub
-  }, [cryptoKey])
 
   const ajouter = async () => {
     if (!nouvelle.trim()) return
     const encrypted = await encrypt({ nom: nouvelle.trim() }, cryptoKey)
-    await addDoc(collection(db, "categories"), encrypted)
+    await addDoc(userCollection(uid, "categories"), encrypted)
     setNouvelle("")
   }
 
   const supprimer = async (id) => {
     if (confirm("Supprimer cette catégorie ?")) {
-      await deleteDoc(doc(db, "categories", id))
+      await deleteDoc(userDoc(uid, "categories", id))
     }
   }
 
@@ -58,23 +45,13 @@ export default function Categories({ cryptoKey }) {
 
     // 1. Mettre à jour la catégorie
     const encryptedCat = await encrypt({ nom: nouveauNom.trim() }, cryptoKey)
-    await updateDoc(doc(db, "categories", cat.id), encryptedCat)
+    await updateDoc(userDoc(uid, "categories", cat.id), encryptedCat)
 
     // 2. Mettre à jour toutes les transactions qui utilisent cette catégorie
-    const transSnap = await getDocs(collection(db, "transactions"))
-    const updates = []
-    for (const d of transSnap.docs) {
-      try {
-        const data = await decrypt(d.data(), cryptoKey)
-        if (data.categorie === cat.nom) {
-          const updated = { ...data, categorie: nouveauNom.trim() }
-          const encrypted = await encrypt(updated, cryptoKey)
-          updates.push(updateDoc(doc(db, "transactions", d.id), encrypted))
-        }
-      } catch {
-        // ignore
-      }
-    }
+    const updates = transactions.filter(t => t.categorie === cat.nom).map(async ({ id, ...data }) => {
+      const encrypted = await encrypt({ ...data, categorie: nouveauNom.trim() }, cryptoKey)
+      await updateDoc(userDoc(uid, "transactions", id), encrypted)
+    })
     await Promise.all(updates)
     console.log(`✅ ${updates.length} transactions mises à jour`)
 

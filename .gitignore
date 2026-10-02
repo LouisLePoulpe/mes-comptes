@@ -25,3 +25,6 @@ dist-ssr
 
 import-comptes/serviceAccount.json
 import-comptes/serviceAccount.json.json
+# Private migration exports and local emulator state
+.migration/
+.firebase/

@@ -1,10 +1,10 @@
 import { useState } from "react"
-import { db } from "../firebase"
-import { doc, getDoc } from "firebase/firestore"
-import { deriveKey, saveKeyLocally } from "../crypto"
+import { userDoc } from "../data/references"
+import { getDoc } from "firebase/firestore"
+import { deriveKey, saveKeyLocally, decrypt } from "../crypto"
 import { Eye, EyeOff } from "lucide-react"
 
-export default function Unlock({ onComplete }) {
+export default function Unlock({ uid, onComplete }) {
   const [mode, setMode] = useState("passphrase") // "passphrase" | "recovery"
   const [passphrase, setPassphrase] = useState("")
   const [recoveryKey, setRecoveryKey] = useState("")
@@ -17,7 +17,7 @@ export default function Unlock({ onComplete }) {
     setError("")
     try {
       // Récupérer le salt depuis Firestore
-      const configDoc = await getDoc(doc(db, "config", "crypto"))
+      const configDoc = await getDoc(userDoc(uid, "config", "crypto"))
       if (!configDoc.exists()) throw new Error("Configuration introuvable")
       const { saltHex } = configDoc.data()
 
@@ -26,18 +26,18 @@ export default function Unlock({ onComplete }) {
 
       // Vérifier que la clé est correcte en tentant de déchiffrer un doc test
       // On stocke un petit doc de vérification lors du setup
-      const verifDoc = await getDoc(doc(db, "config", "verif"))
+      const verifDoc = await getDoc(userDoc(uid, "config", "verif"))
+      if (!verifDoc.exists()) throw new Error("Document de vérification manquant : restauration requise")
       if (verifDoc.exists()) {
         const { encrypted } = verifDoc.data()
         try {
-          const { decrypt } = await import("../crypto")
-          await decrypt(encrypted, key)
+          if ((await decrypt(encrypted, key)).verif !== "ok") throw new Error("Vérification invalide")
         } catch {
           throw new Error("Passphrase incorrecte")
         }
       }
 
-      await saveKeyLocally(key, saltHex)
+      await saveKeyLocally(key, saltHex, uid)
       onComplete(key)
     } catch (e) {
       setError(e.message || "Passphrase incorrecte")
@@ -49,22 +49,17 @@ export default function Unlock({ onComplete }) {
     setLoading(true)
     setError("")
     try {
-      const configDoc = await getDoc(doc(db, "config", "crypto"))
+      const configDoc = await getDoc(userDoc(uid, "config", "crypto"))
       if (!configDoc.exists()) throw new Error("Configuration introuvable")
-      const { saltHex, recoveryVerif } = configDoc.data()
-
-      // Vérifier la clé de récupération
+      const { saltHex, wrappedKey } = configDoc.data()
+      if (!wrappedKey) throw new Error("La récupération V1 ne contient pas la clé de chiffrement. Utilise ta passphrase d’origine ou un appareil déjà déverrouillé.")
       const { key: recoveryDerived } = await deriveKey(recoveryKey.trim(), saltHex)
-      const exported = await crypto.subtle.exportKey("raw", recoveryDerived)
-      const verifHex = Array.from(new Uint8Array(exported)).map(b => b.toString(16).padStart(2,"0")).join("")
-
-      if (verifHex !== recoveryVerif) throw new Error("Clé de récupération incorrecte")
-
-      // Clé valide — demander une nouvelle passphrase
-      alert("Clé de récupération valide ! Tu vas devoir reconfigurer une nouvelle passphrase.")
-      // Reset la config pour forcer un nouveau Setup
-      localStorage.clear()
-      window.location.reload()
+      const raw = await decrypt(wrappedKey, recoveryDerived)
+      const key = await crypto.subtle.importKey("raw", new Uint8Array(raw), "AES-GCM", true, ["encrypt", "decrypt"])
+      const verif = await getDoc(userDoc(uid, "config", "verif"))
+      if (!verif.exists() || (await decrypt(verif.data().encrypted, key)).verif !== "ok") throw new Error("Vérification impossible")
+      await saveKeyLocally(key, saltHex, uid)
+      onComplete(key)
     } catch (e) {
       setError(e.message || "Clé de récupération incorrecte")
     }

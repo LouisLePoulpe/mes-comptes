@@ -1,7 +1,5 @@
-import { useState, useEffect } from "react"
-import { db } from "../firebase"
-import { collection, onSnapshot, query } from "firebase/firestore"
-import { decrypt } from "../crypto"
+import { useState } from "react"
+import { useData } from "../data/context"
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -21,29 +19,24 @@ function regression(data, key) {
   return data.map((d, i) => ({ ...d, [`${key}_trend`]: Math.round(a * i + b) }))
 }
 
+// Variation selectors are intentionally stripped alongside emoji ranges.
+// eslint-disable-next-line no-misleading-character-class
 const stripEmojis = (str) => str?.replace(/[\u{1F000}-\u{1FFFF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{FE00}-\u{FE0F}|\u{1F900}-\u{1F9FF}|\u{1FA00}-\u{1FAFF}]/gu, "").trim() || ""
 
-export default function Dashboard({ cryptoKey }) {
-  const moisCourant = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}`
-  const [transactions, setTransactions] = useState([])
-  const [moisFiltre, setMoisFiltre] = useState(moisCourant)
-  const [courbes, setCourbes] = useState({ BB: true, CMB: true, TR: true })
+  const KPI = ({ label, value, color }) => (
+    <div className="bg-gray-800 rounded-2xl p-4">
+      <p className="text-xs text-gray-400 mb-1">{label}</p>
+      <p className={`text-2xl font-bold ${color}`}>{value.toFixed(2)} €</p>
+    </div>
+  )
 
-  useEffect(() => {
-    const q = query(collection(db, "transactions"))
-    const unsub = onSnapshot(q, async (snap) => {
-      const decrypted = await Promise.all(snap.docs.map(async d => {
-        try {
-          const data = await decrypt(d.data(), cryptoKey)
-          return { id: d.id, ...data }
-        } catch {
-          return null
-        }
-      }))
-      setTransactions(decrypted.filter(Boolean).sort((a,b) => new Date(a.date) - new Date(b.date)))
-    })
-    return unsub
-  }, [cryptoKey])
+
+export default function Dashboard() {
+  const { transactions, accounts } = useData()
+  const moisCourant = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}`
+  const [moisFiltre, setMoisFiltre] = useState(moisCourant)
+  const [courbes, setCourbes] = useState({})
+
 
   // Liste des mois disponibles
   const moisDisponibles = []
@@ -70,7 +63,7 @@ export default function Dashboard({ cryptoKey }) {
   })
 
   // KPIs
-  const soldes = { BB: 0, CMB: 0, TR: 0 }
+  const soldes = Object.fromEntries(accounts.map(a => [a.id, 0]))
   let totalSorties = 0
   filtrées.forEach(t => {
     const m = t.type === "Entrée" ? t.montant : -t.montant
@@ -78,30 +71,26 @@ export default function Dashboard({ cryptoKey }) {
     if (t.type === "Sortie") totalSorties += t.montant
   })
 
-  // Entrées BB uniquement pour le calcul des pourcentages
-  const entreesBB = filtrées
-    .filter(t => t.type === "Entrée" && t.banque === "BB")
+  // Entrées de tous les comptes pour le calcul des pourcentages
+  const entrees = filtrées
+    .filter(t => t.type === "Entrée" )
     .reduce((sum, t) => sum + t.montant, 0)
 
   // Graphique progression
   const graphData = []
-  const running = { BB: 0, CMB: 0, TR: 0 }
+  const running = Object.fromEntries(accounts.map(a => [a.id, 0]))
   transactions.forEach(t => {
     const m = t.type === "Entrée" ? t.montant : -t.montant
-    running[t.banque] += m
+    running[t.banque] = (running[t.banque] || 0) + m
     const date = new Date(t.date).toLocaleDateString("fr-FR")
     graphData.push({
       date,
-      BB: Math.round(running.BB),
-      CMB: Math.round(running.CMB),
-      TR: Math.round(running.TR),
+      ...Object.fromEntries(Object.entries(running).map(([id, value]) => [id, Math.round(value)])),
     })
   })
 
   // Tendances
-  let graphDataWithTrend = regression(graphData, "BB")
-  graphDataWithTrend = regression(graphDataWithTrend, "CMB")
-  graphDataWithTrend = regression(graphDataWithTrend, "TR")
+  const graphDataWithTrend = accounts.reduce((data, account) => regression(data, account.id), graphData)
 
   // Camembert
   // Pass 1 : accumuler uniquement les non-Retrait
@@ -130,14 +119,8 @@ export default function Dashboard({ cryptoKey }) {
     .sort((a,b) => b[1]-a[1])
     .map(([name, value]) => ({ name, value: Math.round(value) }))
 
-  const toggleCourbe = (k) => setCourbes(c => ({ ...c, [k]: !c[k] }))
+  const toggleCourbe = (k) => setCourbes(c => ({ ...c, [k]: c[k] === false }))
 
-  const KPI = ({ label, value, color }) => (
-    <div className="bg-gray-800 rounded-2xl p-4">
-      <p className="text-xs text-gray-400 mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${color}`}>{value.toFixed(2)} €</p>
-    </div>
-  )
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-6">
@@ -159,10 +142,8 @@ export default function Dashboard({ cryptoKey }) {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3">
-        <KPI label="BoursoBank" value={soldes.BB} color={soldes.BB >= 0 ? "text-emerald-400" : "text-red-400"} />
+        {accounts.map(a => <KPI key={a.id} label={a.name} value={soldes[a.id] || 0} color="text-emerald-400" />)}
         <KPI label="Consommation" value={totalSorties} color="text-red-400" />
-        <KPI label="Crédit Mutuel" value={soldes.CMB} color="text-yellow-400" />
-        <KPI label="Trade Republic" value={soldes.TR} color="text-yellow-400" />
       </div>
 
       {/* Camembert */}
@@ -185,7 +166,7 @@ export default function Dashboard({ cryptoKey }) {
             </ResponsiveContainer>
             <div className="flex flex-col gap-2 w-full">
               {pieData.map((entry, i) => {
-                const pct = entreesBB > 0 ? Math.round((entry.value / entreesBB) * 100) : 0
+                const pct = entrees > 0 ? Math.round((entry.value / entrees) * 100) : 0
                 let couleur = "text-emerald-400"
                 if (entry.name.includes("Charges") && pct > 50) couleur = "text-red-400"
                 if (entry.name.includes("Plaisir")  && pct > 30) couleur = "text-red-400"
@@ -212,20 +193,16 @@ export default function Dashboard({ cryptoKey }) {
         <div className="bg-gray-800 rounded-2xl p-4">
           <p className="text-sm text-gray-400 mb-3">Progression des comptes</p>
           <div className="flex gap-2 mb-3">
-            {[
-              { key: "BB",  color: "bg-yellow-400" },
-              { key: "CMB", color: "bg-blue-400" },
-              { key: "TR",  color: "bg-orange-400" }
-            ].map(({ key, color }) => (
+            {accounts.map(({ id: key, name, color }) => (
               <button
                 key={key}
                 onClick={() => toggleCourbe(key)}
                 className={`flex items-center gap-1 px-3 py-1 rounded-lg text-sm font-semibold transition ${
-                  courbes[key] ? "bg-gray-700 text-white" : "bg-gray-900 text-gray-600"
+                  courbes[key] !== false ? "bg-gray-700 text-white" : "bg-gray-900 text-gray-600"
                 }`}
               >
-                <span className={`w-2 h-2 rounded-full ${courbes[key] ? color : "bg-gray-600"}`} />
-                {key}
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                {name}
               </button>
             ))}
           </div>
@@ -234,12 +211,8 @@ export default function Dashboard({ cryptoKey }) {
               <XAxis dataKey="date" hide />
               <YAxis width={55} tick={{ fill: "#9ca3af", fontSize: 11 }} />
               <Tooltip contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px" }} />
-              {courbes.BB  && <Line type="monotone" dataKey="BB"  stroke="#facc15" dot={false} strokeWidth={2} />}
-              {courbes.CMB && <Line type="monotone" dataKey="CMB" stroke="#60a5fa" dot={false} strokeWidth={2} />}
-              {courbes.TR  && <Line type="monotone" dataKey="TR"  stroke="#f97316" dot={false} strokeWidth={2} />}
-              {courbes.BB  && <Line type="monotone" dataKey="BB_trend"  stroke="#facc15" dot={false} strokeWidth={1} strokeDasharray="5 5" />}
-              {courbes.CMB && <Line type="monotone" dataKey="CMB_trend" stroke="#60a5fa" dot={false} strokeWidth={1} strokeDasharray="5 5" />}
-              {courbes.TR  && <Line type="monotone" dataKey="TR_trend"  stroke="#f97316" dot={false} strokeWidth={1} strokeDasharray="5 5" />}
+              {accounts.filter(a => courbes[a.id] !== false).map(a => <Line key={a.id} name={a.name} type="monotone" dataKey={a.id} stroke={a.color} dot={false} strokeWidth={2} />)}
+              {accounts.filter(a => courbes[a.id] !== false).map(a => <Line key={`${a.id}_trend`} name={`${a.name} (tendance)`} type="monotone" dataKey={`${a.id}_trend`} stroke={a.color} dot={false} strokeWidth={1} strokeDasharray="5 5" />)}
             </LineChart>
           </ResponsiveContainer>
         </div>

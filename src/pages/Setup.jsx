@@ -1,10 +1,11 @@
 import { useState } from "react"
 import { db } from "../firebase"
-import { doc, setDoc } from "firebase/firestore"
-import { deriveKey, generateRecoveryKey, saveKeyLocally } from "../crypto"
+import { userDoc } from "../data/references"
+import { runTransaction } from "firebase/firestore"
+import { deriveKey, generateRecoveryKey, saveKeyLocally, encrypt } from "../crypto"
 import { Eye, EyeOff, Copy, Check } from "lucide-react"
 
-export default function Setup({ onComplete }) {
+export default function Setup({ uid, onComplete }) {
   const [step, setStep] = useState(1)
   const [passphrase, setPassphrase] = useState("")
   const [confirm, setConfirm] = useState("")
@@ -35,19 +36,18 @@ export default function Setup({ onComplete }) {
     setLoading(true)
     try {
       const { key, saltHex } = await deriveKey(passphrase)
-      await saveKeyLocally(key, saltHex)
-
-      // Stocker le salt et un hash de vérification dans Firestore
-      const verif = await deriveKey(recoveryKey, saltHex)
-      const verifExported = await crypto.subtle.exportKey("raw", verif.key)
-      const verifHex = Array.from(new Uint8Array(verifExported)).map(b => b.toString(16).padStart(2,"0")).join("")
-
-      await setDoc(doc(db, "config", "crypto"), {
-        saltHex,
-        recoveryVerif: verifHex,
-        createdAt: new Date().toISOString()
+      const recovery = await deriveKey(recoveryKey, saltHex)
+      const rawKey = Array.from(new Uint8Array(await crypto.subtle.exportKey("raw", key)))
+      const wrappedKey = await encrypt(rawKey, recovery.key)
+      const encrypted = await encrypt({ verif: "ok" }, key)
+      const configRef = userDoc(uid, "config", "crypto")
+      const verifRef = userDoc(uid, "config", "verif")
+      await runTransaction(db, async transaction => {
+        if ((await transaction.get(configRef)).exists()) throw new Error("Coffre déjà configuré : recharge la page")
+        transaction.set(configRef, { saltHex, wrappedKey, createdAt: new Date().toISOString() })
+        transaction.set(verifRef, { encrypted })
       })
-
+      await saveKeyLocally(key, saltHex, uid)
       onComplete(key)
     } catch (e) {
       setError("Erreur lors de la création : " + e.message)
@@ -60,7 +60,7 @@ export default function Setup({ onComplete }) {
       <div className="w-full max-w-md flex flex-col gap-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-emerald-400 mb-2">🔐 Chiffrement</h1>
-          <p className="text-gray-400 text-sm">Crée une passphrase pour sécuriser tes données</p>
+          <p className="text-gray-400 text-sm">Crée une passphrase pour un nouveau coffre V2. Si tu utilises déjà la V1, attends la migration de ton historique avant de configurer ce coffre.</p>
         </div>
 
         <div className="bg-gray-800 rounded-2xl p-5 flex flex-col gap-4">

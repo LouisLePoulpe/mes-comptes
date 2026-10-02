@@ -88,15 +88,15 @@ export function generateRecoveryKey() {
 }
 
 // ── STOCKER / RÉCUPÉRER LA CLÉ LOCALE ───────────────────────────────────────
-export async function saveKeyLocally(key, saltHex) {
+export async function saveKeyLocally(key, saltHex, uid) {
   const exported = await crypto.subtle.exportKey("raw", key)
-  localStorage.setItem(KEY_KEY, buf2b64(exported))
-  localStorage.setItem(SALT_KEY, saltHex)
+  localStorage.setItem(`${KEY_KEY}:${uid}`, buf2b64(exported))
+  localStorage.setItem(`${SALT_KEY}:${uid}`, saltHex)
 }
 
-export async function loadKeyLocally() {
-  const keyB64 = localStorage.getItem(KEY_KEY)
-  const saltHex = localStorage.getItem(SALT_KEY)
+export async function loadKeyLocally(uid) {
+  const keyB64 = localStorage.getItem(`${KEY_KEY}:${uid}`)
+  const saltHex = localStorage.getItem(`${SALT_KEY}:${uid}`)
   if (!keyB64 || !saltHex) return null
   const key = await crypto.subtle.importKey(
     "raw", b642buf(keyB64), { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
@@ -104,7 +104,7 @@ export async function loadKeyLocally() {
   return { key, saltHex }
 }
 
-export function clearKeyLocally() {
-  localStorage.removeItem(KEY_KEY)
-  localStorage.removeItem(SALT_KEY)
+export function clearKeyLocally(uid) {
+  localStorage.removeItem(`${KEY_KEY}:${uid}`)
+  localStorage.removeItem(`${SALT_KEY}:${uid}`)
 }
