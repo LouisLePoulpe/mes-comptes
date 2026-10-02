@@ -16,6 +16,7 @@ Node 22+ and Java 21+ are required for emulator tests.
 
 ```sh
 npm ci --legacy-peer-deps
+npm ci --prefix import-comptes --ignore-scripts
 npm test
 npm run lint
 npm run build
@@ -47,3 +48,11 @@ Form labels and icon actions are accessible by name. Users can leave setup/locke
 This PR does not include a production migration command. Before adding one: rehearse with the real backup privately; independently validate the uid mapping; verify restore of V1 backup; review existing production rules (not available in this repository); agree on a short V1 write freeze; take a fresh consistent export after the freeze; copy and verify all records; then coordinate rule and frontend releases. A V2 vault already created in the target uid must be investigated rather than overwritten.
 
 Do not allow V1 and V2 to write diverging copies during cutover. Keep V1 root collections and backup intact. Before V2 writes begin, rollback can restore V1 app/rules; after V2 writes begin, reconciliation is required before reverting. Never “rollback” by deleting original data. Merge alone is not permission to deploy rules or migrate live data.
+
+## Read-only V1 backup tool
+
+`node scripts/export-v1.mjs --production-read-only .migration/v1-backup.json` reads only the three V1 root collections in project `comptes-44440`, in one read-only Firestore transaction. It creates a new private JSON file (permissions 0600), refuses overwrite, and reports counts only. It never decrypts data, writes to Firestore, or infers ownership. Unsupported Firestore-specific value types abort rather than being converted. A failed disk write may leave an incomplete local file: retain it for diagnosis and use a new filename for retry.
+
+Install dependencies with `npm ci --prefix import-comptes --ignore-scripts`. Production requires Application Default Credentials authorized to read Firestore, preferably a dedicated read-only identity. Keep credentials outside the repository and do not paste keys or passphrases into the conversation. The tool has not been run against production. With a local emulator use `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node scripts/export-v1.mjs --emulator .migration/test.json`.
+
+Keep the original backup untouched and rehearse using the dry-run and emulator copy steps above. The backup is a consistent snapshot, but later V1 writes are not included; take a final snapshot during the agreed write freeze. Confirm the owner's actual Firebase uid separately before any copy. Production migration and deployment remain gated on this validation.

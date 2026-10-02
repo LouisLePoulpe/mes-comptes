@@ -19,6 +19,7 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: npm ci --legacy-peer-deps
+      - run: npm ci --prefix import-comptes --ignore-scripts
       - run: npm test
       - run: npm run lint
       - run: npm run build
