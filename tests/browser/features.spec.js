@@ -109,3 +109,34 @@ test('partage mobile : fichier Excel, annulation et solution de téléchargement
   await page.getByRole('button',{name:'Export Excel',exact:true}).click()
   expect((await downloading).suggestedFilename()).toBe('mes-comptes.xlsx')
 })
+
+test('un import interrompu après 100 lignes reprend sans perte ni doublon', async ({ page }, info) => {
+  await page.goto('./')
+  await login(page, `batch-${info.project.name}@example.test`)
+  await setup(page)
+  const imported = Array.from({length:205},(_,index)=>({...records[0],Description:`Historique ${index}`,Montant:1}))
+  const count = await page.evaluate(async rows => {
+    const { auth } = await import('/mes-comptes/src/firebase.js')
+    const { loadKeyLocally } = await import('/mes-comptes/src/crypto.js')
+    const { planImport } = await import('/mes-comptes/src/transfer/plan.js')
+    const { commitImport } = await import('/mes-comptes/src/transfer/import.js')
+    const uid = auth.currentUser.uid
+    const {key} = await loadKeyLocally(uid)
+    const source = rows.map(row=>({type:row.Type,montant:row.Montant,banque:row.Banque,categorie:row.Catégorie,description:row.Description,date:'2001-01-15T00:00:00.000Z'}))
+    const plan = await planImport(source,{BB:'__new__'},[],[],[])
+    let progress = 0
+    try { await commitImport(uid,key,plan,current=>{progress=current;throw new Error('simulated interruption')}) }
+    catch(error) { if(error.message!=='simulated interruption') throw error }
+    return progress
+  }, imported)
+  expect(count).toBe(100)
+  await navigate(page,'Historique')
+  await expect(page.getByText('100 transactions',{exact:true})).toBeVisible()
+  await chooseImport(page,imported)
+  await page.getByRole('button',{name:'Préparer l’aperçu'}).click()
+  await expect(page.getByText('105 à ajouter · 100 déjà présentes')).toBeVisible()
+  await page.getByRole('button',{name:'Confirmer l’import'}).click()
+  await expect(page.getByRole('status')).toHaveText('Import terminé : 105 ajoutées, 100 déjà présentes.')
+  await page.getByRole('button',{name:'Retour',exact:true}).click()
+  await expect(page.getByText('205 transactions',{exact:true})).toBeVisible()
+})
