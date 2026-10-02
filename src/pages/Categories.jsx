@@ -79,6 +79,7 @@ export default function Categories({ cryptoKey }) {
           className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
         />
         <button
+          aria-label="Ajouter la catégorie"
           onClick={ajouter}
           className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl transition"
         >
@@ -107,19 +108,19 @@ export default function Categories({ cryptoKey }) {
             <div className="flex gap-2 shrink-0">
               {enEdition === cat.id ? (
                 <>
-                  <button onClick={() => sauvegarderNom(cat)} className="text-emerald-400 hover:text-emerald-300 transition">
+                  <button aria-label="Enregistrer le nom" onClick={() => sauvegarderNom(cat)} className="text-emerald-400 hover:text-emerald-300 transition">
                     <Check size={18} />
                   </button>
-                  <button onClick={cancelEdit} className="text-gray-500 hover:text-white transition">
+                  <button aria-label="Annuler la modification" onClick={cancelEdit} className="text-gray-500 hover:text-white transition">
                     <X size={18} />
                   </button>
                 </>
               ) : (
                 <>
-                  <button onClick={() => startEdit(cat)} className="text-gray-500 hover:text-blue-400 transition">
+                  <button aria-label={`Modifier ${cat.nom}`} onClick={() => startEdit(cat)} className="text-gray-500 hover:text-blue-400 transition">
                     <Pencil size={18} />
                   </button>
-                  <button onClick={() => supprimer(cat.id)} className="text-gray-500 hover:text-red-400 transition">
+                  <button aria-label={`Supprimer ${cat.nom}`} onClick={() => supprimer(cat.id)} className="text-gray-500 hover:text-red-400 transition">
                     <Trash2 size={18} />
                   </button>
                 </>

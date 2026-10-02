@@ -95,23 +95,24 @@ export default function Unlock({ uid, onComplete }) {
           {mode === "passphrase" ? (
             <>
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">Passphrase</label>
+                <label htmlFor="Unlock-passphrase" className="text-sm text-gray-400 mb-1 block">Passphrase</label>
                 <div className="relative">
                   <input
                     type={show ? "text" : "password"}
+                    id="Unlock-passphrase"
                     value={passphrase}
                     onChange={e => setPassphrase(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && handleUnlock()}
                     placeholder="Ta passphrase..."
                     className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 pr-12"
                   />
-                  <button onClick={() => setShow(s => !s)} className="absolute right-3 top-3 text-gray-400">
+                  <button aria-label={show ? "Masquer la passphrase" : "Afficher la passphrase"} onClick={() => setShow(s => !s)} className="absolute right-3 top-3 text-gray-400">
                     {show ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
               </div>
 
-              {error && <p className="text-red-400 text-sm">{error}</p>}
+              {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
 
               <button
                 onClick={handleUnlock}
@@ -124,8 +125,9 @@ export default function Unlock({ uid, onComplete }) {
           ) : (
             <>
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">Clé de récupération (24 mots)</label>
+                <label htmlFor="Unlock-recoveryKey" className="text-sm text-gray-400 mb-1 block">Clé de récupération (24 mots)</label>
                 <textarea
+                  id="Unlock-recoveryKey"
                   value={recoveryKey}
                   onChange={e => setRecoveryKey(e.target.value)}
                   placeholder="mot1-mot2-mot3-..."
@@ -134,7 +136,7 @@ export default function Unlock({ uid, onComplete }) {
                 />
               </div>
 
-              {error && <p className="text-red-400 text-sm">{error}</p>}
+              {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
 
               <button
                 onClick={handleRecovery}

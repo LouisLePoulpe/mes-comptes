@@ -1,1 +1,6 @@
 @import "tailwindcss";
+/* Keep Firebase's local-only warning visible without covering mobile navigation. */
+.firebase-emulator-warning {
+  pointer-events: none;
+  bottom: 4rem !important;
+}

@@ -63,7 +63,11 @@ export default function App() {
     setCryptoState("ready")
   }
 
-  const login = () => signInWithPopup(auth, googleProvider)
+  const login = async () => {
+    setError("")
+    try { await signInWithPopup(auth, googleProvider) }
+    catch { setError("Connexion annulée ou impossible. Tu peux réessayer.") }
+  }
   const logout = () => {
     clearKeyLocally(user.uid)
     setCryptoKey(null)
@@ -81,6 +85,7 @@ export default function App() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 text-white gap-6">
       <h1 className="text-4xl font-bold text-emerald-400">💰 Mes Comptes</h1>
       <p className="text-gray-400">Connecte-toi pour accéder à tes finances</p>
+      {error && <p role="alert">{error}</p>}
       <button
         onClick={login}
         className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-8 py-3 rounded-xl transition"
@@ -90,7 +95,7 @@ export default function App() {
     </div>
   )
 
-  if (error) return <div role="alert">{error}<button onClick={logout}>Se déconnecter</button></div>
+  if (error) return <div role="alert">{error}<button aria-label="Se déconnecter" onClick={logout}>Se déconnecter</button></div>
 
   if (cryptoState === "checking") return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
@@ -98,8 +103,14 @@ export default function App() {
     </div>
   )
 
-  if (cryptoState === "setup") return <Setup key={user.uid} uid={user.uid} onComplete={handleComplete} />
-  if (cryptoState === "unlock") return <Unlock key={user.uid} uid={user.uid} onComplete={handleComplete} />
+  if (cryptoState === "setup" || cryptoState === "unlock") return (
+    <>
+      <button onClick={logout} className="fixed top-4 right-4 text-white z-10">Se déconnecter</button>
+      {cryptoState === "setup"
+        ? <Setup key={user.uid} uid={user.uid} onComplete={handleComplete} />
+        : <Unlock key={user.uid} uid={user.uid} onComplete={handleComplete} />}
+    </>
+  )
 
   const nav = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -115,7 +126,7 @@ export default function App() {
         <h1 className="text-xl font-bold text-emerald-400">💰 Mes Comptes</h1>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-400 hidden sm:block">{user.displayName}</span>
-          <button onClick={logout} className="text-gray-400 hover:text-white transition">
+          <button aria-label="Se déconnecter" onClick={logout} className="text-gray-400 hover:text-white transition">
             <LogOut size={20} />
           </button>
         </div>

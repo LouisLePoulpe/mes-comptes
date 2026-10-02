@@ -65,25 +65,27 @@ export default function Setup({ uid, onComplete }) {
 
         <div className="bg-gray-800 rounded-2xl p-5 flex flex-col gap-4">
           <div>
-            <label className="text-sm text-gray-400 mb-1 block">Passphrase</label>
+            <label htmlFor="Setup-passphrase" className="text-sm text-gray-400 mb-1 block">Passphrase</label>
             <div className="relative">
               <input
                 type={show ? "text" : "password"}
+                id="Setup-passphrase"
                 value={passphrase}
                 onChange={e => setPassphrase(e.target.value)}
                 placeholder="Min. 8 caractères..."
                 className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 pr-12"
               />
-              <button onClick={() => setShow(s => !s)} className="absolute right-3 top-3 text-gray-400">
+              <button aria-label={show ? "Masquer la passphrase" : "Afficher la passphrase"} onClick={() => setShow(s => !s)} className="absolute right-3 top-3 text-gray-400">
                 {show ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
           </div>
 
           <div>
-            <label className="text-sm text-gray-400 mb-1 block">Confirmer la passphrase</label>
+            <label htmlFor="Setup-confirm" className="text-sm text-gray-400 mb-1 block">Confirmer la passphrase</label>
             <input
               type={show ? "text" : "password"}
+              id="Setup-confirm"
               value={confirm}
               onChange={e => setConfirm(e.target.value)}
               placeholder="Répète ta passphrase..."
@@ -91,7 +93,7 @@ export default function Setup({ uid, onComplete }) {
             />
           </div>
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
 
           <div className="bg-gray-900 rounded-xl p-3 text-xs text-gray-400">
             ⚠️ Ta passphrase chiffre toutes tes données. Si tu la perds sans clé de récupération, tes données seront <span className="text-red-400 font-semibold">irrécupérables</span>.
@@ -118,7 +120,7 @@ export default function Setup({ uid, onComplete }) {
 
         <div className="bg-gray-800 rounded-2xl p-5 flex flex-col gap-4">
           <div className="bg-gray-900 rounded-xl p-4">
-            <p className="text-emerald-400 font-mono text-sm leading-relaxed break-all">
+            <p aria-label="Clé à conserver" className="text-emerald-400 font-mono text-sm leading-relaxed break-all">
               {recoveryKey}
             </p>
           </div>
@@ -145,7 +147,7 @@ export default function Setup({ uid, onComplete }) {
             <span className="text-sm text-gray-300">J'ai sauvegardé ma clé de récupération en lieu sûr</span>
           </label>
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
 
           <button
             onClick={handleFinish}

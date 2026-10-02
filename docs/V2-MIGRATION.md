@@ -20,9 +20,17 @@ npm test
 npm run lint
 npm run build
 npm run test:rules
+npx playwright install chromium
+npm run test:e2e
 ```
 
 The existing Vite/PWA peer dependency mismatch requires `--legacy-peer-deps`. Existing dependency audit findings remain a separate upgrade task. For interactive preview, start Firestore and Auth with `npx firebase emulators:start --config firebase.v2.json --project demo-mes-comptes-v2`, then `npm run dev`. Default builds use these emulators; `VITE_V2_USE_PRODUCTION=true` is an explicit opt-in, only after the cutover checklist. No real Firebase credentials are needed for emulator tests.
+
+## Browser regression coverage
+
+`npm run test:e2e` starts Auth and Firestore emulators plus the local Vite server. It runs Chromium at desktop and mobile sizes with synthetic accounts only. It covers Google emulator login, vault creation, customizable accounts, old/recent transactions, full-history Excel export (including totals and account names), reload, wrong passphrase, recovery, and switching users in the same browser. A second scenario copies a synthetic V1 archive through the migration planner, unlocks it with the original passphrase, checks the V1 recovery limitation, and verifies the source ciphertext is unchanged. Damaged ciphertext must stop display of partial history; a repaired snapshot restores the view.
+
+Form labels and icon actions are accessible by name. Users can leave setup/locked screens, retry data loading, and correct transaction validation errors without losing their entries. The local emulator warning no longer covers the mobile navigation. CI runs browser checks in addition to build, lint, unit and Firestore tests. None of these tests accesses production Firebase or proves that an actual production export is ready for cutover.
 
 ## Copy rehearsal (no production writer)
 

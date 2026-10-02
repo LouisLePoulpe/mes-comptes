@@ -28,3 +28,7 @@ import-comptes/serviceAccount.json.json
 # Private migration exports and local emulator state
 .migration/
 .firebase/
+
+# Browser test artifacts (synthetic fixtures only)
+/test-results/
+/playwright-report/

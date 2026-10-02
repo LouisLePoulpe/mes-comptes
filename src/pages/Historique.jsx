@@ -8,6 +8,8 @@ import * as XLSX from "xlsx"
 
 function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
   const { uid, accounts } = useData()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
   const [form, setForm] = useState({
     type: transaction.type,
     montant: transaction.montant,
@@ -20,17 +22,21 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const sauvegarder = async () => {
-    if (!accounts.some(a => a.id === form.banque) || !Number.isFinite(Number(form.montant)) || Number(form.montant) <= 0 || !form.date) return alert("Compte, montant et date valides requis")
+    if (saving) return
+    setError("")
+    if (!accounts.some(a => a.id === form.banque) || !Number.isFinite(Number(form.montant)) || Number(form.montant) <= 0 || !Number.isFinite(Date.parse(form.date))) return setError("Compte, montant et date valides requis")
+    setSaving(true)
     try {
-    const data = {
-      ...form,
-      montant: parseFloat(form.montant),
-      date: new Date(form.date).toISOString()
-    }
-    const encrypted = await encrypt(data, cryptoKey)
-    await updateDoc(userDoc(uid, "transactions", transaction.id), encrypted)
-    onSave()
-    } catch { alert("Modification impossible. Réessaie.") }
+      const data = {
+        ...form,
+        montant: parseFloat(form.montant),
+        date: new Date(form.date).toISOString()
+      }
+      const encrypted = await encrypt(data, cryptoKey)
+      await updateDoc(userDoc(uid, "transactions", transaction.id), encrypted)
+      onSave()
+    } catch { setError("Modification impossible. Tes champs sont conservés, tu peux réessayer.") }
+    finally { setSaving(false) }
   }
 
   const btnType = (t) => (
@@ -46,10 +52,10 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-2xl w-full max-w-md flex flex-col gap-4 p-6 max-h-[90vh] overflow-y-auto">
+      <div role="dialog" aria-modal="true" aria-label="Modifier la transaction" className="bg-gray-900 rounded-2xl w-full max-w-md flex flex-col gap-4 p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-bold">Modifier la transaction</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition">
+          <button aria-label="Fermer la modification" onClick={onClose} className="text-gray-500 hover:text-white transition">
             <X size={22} />
           </button>
         </div>
@@ -57,9 +63,10 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
         <div className="flex gap-2">{btnType("Entrée")}{btnType("Sortie")}</div>
 
         <div>
-          <label className="text-sm text-gray-400 mb-1 block">Montant (€)</label>
+          <label htmlFor="Historique-montant" className="text-sm text-gray-400 mb-1 block">Montant (€)</label>
           <input
             type="number"
+            id="Historique-montant"
             value={form.montant}
             onChange={e => set("montant", e.target.value)}
             className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-xl focus:outline-none focus:border-emerald-500"
@@ -82,8 +89,9 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
         </div>
 
         <div>
-          <label className="text-sm text-gray-400 mb-1 block">Catégorie</label>
+          <label htmlFor="Historique-categorie" className="text-sm text-gray-400 mb-1 block">Catégorie</label>
           <select
+            id="Historique-categorie"
             value={form.categorie}
             onChange={e => set("categorie", e.target.value)}
             className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
@@ -94,8 +102,9 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
         </div>
 
         <div>
-          <label className="text-sm text-gray-400 mb-1 block">Description</label>
+          <label htmlFor="Historique-description" className="text-sm text-gray-400 mb-1 block">Description</label>
           <input
+            id="Historique-description"
             value={form.description}
             onChange={e => set("description", e.target.value)}
             className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
@@ -103,20 +112,22 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
         </div>
 
         <div>
-          <label className="text-sm text-gray-400 mb-1 block">Date</label>
+          <label htmlFor="Historique-date" className="text-sm text-gray-400 mb-1 block">Date</label>
           <input
             type="date"
+            id="Historique-date"
             value={form.date}
             onChange={e => set("date", e.target.value)}
             className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
           />
         </div>
 
+        {error && <p role="alert" className="text-red-400">{error}</p>}
         <div className="flex gap-3 mt-2">
           <button onClick={onClose} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 rounded-xl transition">
             Annuler
           </button>
-          <button onClick={sauvegarder} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl transition">
+          <button disabled={saving} onClick={sauvegarder} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl transition">
             ✓ Sauvegarder
           </button>
         </div>
@@ -132,12 +143,15 @@ export default function Historique({ cryptoKey }) {
   const [filtres, setFiltres] = useState({ banque: "", categorie: "", type: "", mois: "", annee: "" })
   const [enEdition, setEnEdition] = useState(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [error, setError] = useState("")
 
 
 
   const supprimer = async (id) => {
     if (confirm("Supprimer cette transaction ?")) {
-      await deleteDoc(userDoc(uid, "transactions", id))
+      setError("")
+      try { await deleteDoc(userDoc(uid, "transactions", id)) }
+      catch { setError("Suppression impossible. La transaction a été conservée.") }
     }
   }
 
@@ -272,6 +286,7 @@ export default function Historique({ cryptoKey }) {
         </div>
       )}
 
+      {error && <p role="alert" className="text-red-400">{error}</p>}
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold">Historique</h2>
@@ -321,10 +336,10 @@ export default function Historique({ cryptoKey }) {
               </div>
             </div>
             <div className="flex gap-2 shrink-0">
-              <button onClick={() => setEnEdition(t)} className="text-gray-500 hover:text-blue-400 transition">
+              <button aria-label={`Modifier ${t.description || "la transaction"}`} onClick={() => setEnEdition(t)} className="text-gray-500 hover:text-blue-400 transition">
                 <Pencil size={16} />
               </button>
-              <button onClick={() => supprimer(t.id)} className="text-gray-500 hover:text-red-400 transition">
+              <button aria-label={`Supprimer ${t.description || "la transaction"}`} onClick={() => supprimer(t.id)} className="text-gray-500 hover:text-red-400 transition">
                 <Trash2 size={16} />
               </button>
             </div>
