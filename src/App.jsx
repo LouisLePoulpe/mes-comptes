@@ -11,6 +11,7 @@ import Login, { VerifyEmail } from "./components/Login"
 import Importer from "./pages/Importer"
 import DataProvider from "./data/DataProvider"
 import ThemeToggle from "./components/ThemeToggle"
+import Settings from "./pages/Settings"
 import Accounts from "./pages/Accounts"
 import Dashboard from "./pages/Dashboard"
 import Historique from "./pages/Historique"
@@ -18,7 +19,7 @@ import Ajouter from "./pages/Ajouter"
 import Categories from "./pages/Categories"
 import Setup from "./pages/Setup"
 import Unlock from "./pages/Unlock"
-import { LayoutDashboard, History, PlusCircle, Tags, LogOut } from "lucide-react"
+import { LayoutDashboard, History, PlusCircle, Tags, LogOut, Settings as SettingsIcon } from "lucide-react"
 
 export default function App() {
   return <><div className="fixed top-3 left-3 z-[250]"><ThemeToggle /></div><Application /></>
@@ -122,6 +123,7 @@ function Application() {
     { id: "ajouter", label: "Ajouter", icon: PlusCircle },
     { id: "accounts", label: "Comptes", icon: Tags },
     { id: "categories", label: "Catégories", icon: Tags },
+    { id: "settings", label: "Paramètres", icon: SettingsIcon },
   ]
 
   return (
@@ -143,6 +145,7 @@ function Application() {
         {page === "ajouter" && <Ajouter cryptoKey={cryptoKey} onSuccess={() => setPage("historique")} />}
         {page === "categories" && <Categories cryptoKey={cryptoKey} />}
         {page === "import" && <Importer cryptoKey={cryptoKey} onClose={() => setPage("historique")} />}
+        {page === "settings" && <Settings user={user} onImport={() => setPage("import")} />}
         {page === "accounts" && <Accounts cryptoKey={cryptoKey} />}
       </main>
       </DataProvider>
@@ -152,7 +155,7 @@ function Application() {
           <button
             key={id}
             onClick={() => setPage(id)}
-            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-lg transition text-xs ${
+            className={`flex flex-col items-center gap-1 px-1 sm:px-3 py-1 rounded-lg transition text-xs ${
               page === id ? "text-positive" : "text-muted hover:text-muted"
             }`}
           >
