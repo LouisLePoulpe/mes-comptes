@@ -20,6 +20,7 @@ import Categories from "./pages/Categories"
 import Setup from "./pages/Setup"
 import Unlock from "./pages/Unlock"
 import { LayoutDashboard, History, PlusCircle, LogOut, Settings as SettingsIcon } from "lucide-react"
+import { deleteCurrentAccount } from './accountDeletion'
 
 export default function App() {
   return <Application />
@@ -33,6 +34,7 @@ function Application() {
   const [cryptoState, setCryptoState] = useState("checking") // "checking" | "setup" | "unlock" | "ready"
 
   const [error, setError] = useState("")
+  const [deleting, setDeleting] = useState(false)
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
     const handle = NativeApp.addListener('backButton', () => {
@@ -89,6 +91,12 @@ function Application() {
     setCryptoState("checking")
     logoutGoogle().catch(() => setError("Déconnexion incomplète. Réessaie."))
   }
+  const deleteAccount = async credentials => {
+    setDeleting(true); setError('')
+    try { await deleteCurrentAccount({ ...credentials, confirm: true }) }
+    catch (cause) { setDeleting(false); setError(cause?.code === 'auth/wrong-password' ? 'Mot de passe incorrect.' : cause?.message || 'Suppression impossible.') }
+  }
+  if (deleting) return <div className="min-h-screen flex items-center justify-center bg-app text-foreground p-6 text-center">Suppression de ton compte en cours…</div>
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-app text-foreground">
@@ -144,7 +152,7 @@ function Application() {
         {page === "ajouter" && <Ajouter cryptoKey={cryptoKey} onSuccess={() => setPage("historique")} />}
         {page === "categories" && <Categories cryptoKey={cryptoKey} />}
         {page === "import" && <Importer cryptoKey={cryptoKey} onClose={() => setPage("historique")} />}
-        {page === "settings" && <Settings user={user} onAccounts={() => setPage("accounts")} onCategories={() => setPage("categories")} onImport={() => setPage("import")} />}
+        {page === "settings" && <Settings user={user} onAccounts={() => setPage("accounts")} onCategories={() => setPage("categories")} onImport={() => setPage("import")} onDelete={deleteAccount} />}
         {page === "accounts" && <Accounts cryptoKey={cryptoKey} />}
       </main>
       </DataProvider>

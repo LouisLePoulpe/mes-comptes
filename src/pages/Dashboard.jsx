@@ -3,15 +3,16 @@ import { trend, orderedCards } from '../domain/trend'
 import { accountMovements } from "../domain/movements"
 import { useState } from "react"
 import { useData } from "../data/context"
+import Info from "../components/Info"
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
 } from "recharts"
 
-  const KPI = ({ label, value, color }) => (
+  const KPI = ({ label, value, color, style }) => (
     <div className="bg-card rounded-2xl p-4">
       <p className="text-xs text-muted mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${color}`}>{value.toFixed(2)} €</p>
+      <p className={`text-2xl font-bold ${color}`} style={style}>{value.toFixed(2)} €</p>
     </div>
   )
 
@@ -73,6 +74,8 @@ export default function Dashboard() {
   const trends = {}
   for (const account of accounts) { const result = trend(graphDataWithTrend,account.id); graphDataWithTrend = result.data; trends[account.id] = result }
   const budget = budgetSummary(filtrées, categories)
+  const budgetColors = preferences.budgetColors || {}
+  budget.groups.forEach(group => { if (/^#[0-9a-f]{6}$/i.test(budgetColors[group.id] || '')) group.color = budgetColors[group.id] })
   const pieData = budget.groups.filter(group=>group.value > 0)
   const money = value => value.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €'
 
@@ -99,24 +102,22 @@ export default function Dashboard() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3">
-        {orderedCards(accounts, preferences.cardOrder).map(id => id === 'consumption' ? <KPI key={id} label="Consommation" value={totalSorties} color="text-negative" /> : <KPI key={id} label={accounts.find(a=>a.id===id).name} value={soldes[id] || 0} color={(soldes[id] || 0) < 0 ? 'text-negative' : 'text-positive'} />)}
+        {orderedCards(accounts, preferences.cardOrder).map(id => id === 'consumption' ? <KPI key={id} label="Consommation" value={totalSorties} color="text-negative" /> : <KPI key={id} label={accounts.find(a=>a.id===id).name} value={soldes[id] || 0} color="" style={{color: accounts.find(a=>a.id===id).color}} />)}
       </div>
       <section aria-label="Budget Charges Épargne Plaisirs" className="bg-card rounded-2xl p-4">
-        <h3 className="font-semibold mb-2">Charges, Épargne et Plaisirs</h3>
-        <p className="text-sm text-muted mb-3">Pourcentages des revenus de la période : {money(budget.income)}. Classement modifiable dans Paramètres → Catégories.</p>
+        <h3 className="font-semibold mb-2 flex items-center gap-2">Charges, Épargne et Plaisirs <Info title="Répartition du budget"><p>Le camembert répartit les montants positifs de la période selon le classement des catégories.</p><p>Les objectifs sont : épargne supérieure à 20 %, plaisirs inférieurs à 30 % et charges inférieures à 50 %. Tu peux modifier le classement et les couleurs dans Paramètres.</p></Info></h3>
         {pieData.length > 0 ? <ResponsiveContainer width="100%" height={210}><PieChart><Pie isAnimationActive={false} data={pieData} nameKey="name" dataKey="value" innerRadius={58} outerRadius={90} paddingAngle={3}>{pieData.map(group=><Cell key={group.id} fill={group.color} />)}</Pie><Tooltip contentStyle={{backgroundColor:'var(--card)',color:'var(--foreground)',borderRadius:12}} formatter={money} /></PieChart></ResponsiveContainer> : <p className="text-muted py-8 text-center">Aucune sortie classée sur cette période.</p>}
         <div className="space-y-3">{budget.groups.map(group=><div key={group.id} data-testid={`budget-${group.id}`} className={`flex justify-between gap-3 ${group.ok === null ? 'text-muted' : group.ok ? 'text-positive' : 'text-negative'}`}>
-          <span><span className="inline-block w-3 h-3 rounded-full mr-2" style={{backgroundColor:group.color}} />{group.name}<small className="block">Objectif {group.id === 'savings' ? '>' : '<'} {group.limit} %</small></span>
-          <span className="text-right font-semibold">{group.percent === null ? '—' : `${group.percent.toLocaleString('fr-FR',{maximumFractionDigits:1})} %`} ({money(group.value)})<small className="block font-normal">{group.ok === null ? 'Sans revenus : non calculable' : group.ok ? 'Objectif respecté' : 'Objectif non respecté'}</small></span>
+          <span><span className="inline-block w-3 h-3 rounded-full mr-2" style={{backgroundColor:group.color}} />{group.name}</span>
+          <span className="text-right font-semibold">{group.percent === null ? '—' : `${group.percent.toLocaleString('fr-FR',{maximumFractionDigits:1})} %`} ({money(group.value)})</span>
         </div>)}</div>
         {budget.unclassified > 0 && <p className="text-sm text-muted mt-3">Sorties à classer : {money(budget.unclassified)}. Elles ne figurent pas dans les trois parts.</p>}
-        <p className="text-xs text-muted mt-3">Le disque représente la répartition des montants positifs. Les retraits diminuent l’épargne ; un montant net négatif reste indiqué dans la légende.</p>
       </section>
 
       {/* Graphique progression */}
       {graphDataWithTrend.length > 0 && (
         <div className="bg-card rounded-2xl p-4">
-          <p className="text-sm text-muted mb-3">Progression des comptes</p>
+          <p className="text-sm text-muted mb-3 flex items-center gap-2">Progression des comptes <Info title="Tendance"><p>La tendance est calculée sur tout l’historique et indique la variation moyenne par mois. Elle ne constitue pas une prévision.</p></Info></p>
           <div className="flex flex-wrap gap-2 mb-3">
             {accounts.map(({ id: key, name, color }) => (
               <button
@@ -131,7 +132,7 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
-          {preferences.showTrendValues && <div className="space-y-2 mb-3" aria-label="Valeurs de tendance">{accounts.filter(a=>courbes[a.id] !== false).map(a=><p key={a.id} className="text-sm">{a.name} : {trends[a.id]?.last == null ? 'Au moins deux dates sont nécessaires.' : `${money(trends[a.id].last)} · ${money(trends[a.id].monthly)}/mois`}</p>)}<p className="text-xs text-muted">Valeur de la droite à la dernière date et variation moyenne par mois (30,44 jours), sur tout l’historique. Ce n’est pas une prévision.</p></div>}
+          {preferences.showTrendValues && <div className="space-y-2 mb-3" aria-label="Valeurs de tendance">{accounts.filter(a=>courbes[a.id] !== false).map(a=><p key={a.id} className="text-sm">{a.name} : {trends[a.id]?.last == null ? '—' : `${money(trends[a.id].last)} · ${money(trends[a.id].monthly)}/mois`}</p>)}</div>}
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={graphDataWithTrend}>
               <XAxis dataKey="timestamp" type="number" domain={["dataMin", "dataMax"]} hide />
