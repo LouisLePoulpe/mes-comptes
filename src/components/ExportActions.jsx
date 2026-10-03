@@ -14,7 +14,7 @@ export default function ExportActions() {
     if (!isAndroid()) { downloadExport(file); setMessage('Téléchargement lancé : mes-comptes.xlsx.'); return }
     setBusy(true)
     try { const result = await saveAndroidExport(file); setMessage(result.cancelled ? 'Enregistrement annulé.' : 'Export enregistré.') }
-    catch { setMessage('Enregistrement impossible. Essaie « Partager l’export ».') }
+    catch (error) { setMessage(`Enregistrement impossible (${error.code || 'EXPORT_UNKNOWN'}). Essaie « Partager l’export » et signale ce code si le problème persiste.`) }
     finally { setBusy(false) }
   }
   async function share() {

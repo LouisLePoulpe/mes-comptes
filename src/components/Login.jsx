@@ -38,7 +38,13 @@ export default function Login() {
   function changeMode(next) { setMode(next); setError(''); setMessage(''); setPassword(''); setConfirmation('') }
   async function google() {
     setBusy(true); setError('')
-    try { await loginGoogle() } catch (e) { setError(e.message?.includes('préversion Android') ? e.message : 'Connexion Google annulée ou impossible.') }
+    try { await loginGoogle() } catch (e) {
+      setError(e.code === 'auth/unauthorized-domain' ? `Cette adresse (${window.location.hostname}) n’est pas autorisée pour Google. Ajoute-la dans Firebase → Authentication → Paramètres → Domaines autorisés.`
+        : e.code === 'auth/popup-blocked' ? 'La fenêtre Google est bloquée. Autorise les fenêtres contextuelles ou ouvre le site dans ton navigateur habituel.'
+        : e.code === 'auth/popup-closed-by-user' ? 'La fenêtre Google a été fermée avant la fin de la connexion.'
+        : e.code === 'auth/network-request-failed' ? 'Connexion Google inaccessible. Vérifie ta connexion Internet.'
+        : e.message?.includes('préversion Android') ? e.message : `Connexion Google impossible (${e.code || 'erreur inconnue'}).`)
+    }
     finally { setBusy(false) }
   }
   return <main className="min-h-screen bg-app text-foreground flex items-center justify-center px-4 py-20">
