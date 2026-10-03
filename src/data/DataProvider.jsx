@@ -1,10 +1,11 @@
+import { db } from '../firebase'
 import { useEffect, useState } from 'react'
-import { onSnapshot } from 'firebase/firestore'
-import { decrypt } from '../crypto'
-import { userCollection } from './references'
+import { onSnapshot, runTransaction } from 'firebase/firestore'
+import { decrypt, encrypt } from '../crypto'
+import { userCollection, userDoc } from './references'
 import { DataContext } from './context'
 
-const COLLECTIONS = ['transactions', 'categories', 'accounts']
+const COLLECTIONS = ['transactions', 'categories', 'accounts', 'preferences']
 
 // Mounted once per authenticated/unlocked session, above page navigation.
 export default function DataProvider({ uid, cryptoKey, children }) {
@@ -14,12 +15,13 @@ export default function DataProvider({ uid, cryptoKey, children }) {
     let active = true
     const stops = COLLECTIONS.map(name => {
       let revision = 0
-      return onSnapshot(userCollection(uid, name), async snapshot => {
+      return onSnapshot(name === 'preferences' ? userDoc(uid, 'config', 'dashboard') : userCollection(uid, name), async snapshot => {
         const current = ++revision
         try {
-          const rows = await Promise.all(snapshot.docs.map(async document => ({
+          const rows = await Promise.all((name === 'preferences' ? (snapshot.exists() ? [snapshot] : []) : snapshot.docs).map(async document => ({
             ...await decrypt(document.data(), cryptoKey), id: document.id,
           })))
+          if (name === 'accounts' || name === 'categories') rows.sort((a,b) => (a.name || a.nom).localeCompare(b.name || b.nom, 'fr', { numeric: true, sensitivity: 'base' }))
           if (name === 'transactions') rows.sort((a, b) => new Date(a.date) - new Date(b.date))
           if (active && current === revision) setData(previous => ({ ...previous, [name]: { rows } }))
         } catch {
@@ -43,6 +45,15 @@ export default function DataProvider({ uid, cryptoKey, children }) {
   </div>
   if (COLLECTIONS.some(name => !data[name]?.rows)) return <p>Chargement de ton historique…</p>
   const rows = Object.fromEntries(COLLECTIONS.map(name => [name, data[name].rows]))
+  const preferences = rows.preferences[0] || {}
+  const savePreferences = async patch => {
+    const ref = userDoc(uid, 'config', 'dashboard')
+    await runTransaction(db, async transaction => {
+      const snapshot = await transaction.get(ref)
+      const current = snapshot.exists() ? await decrypt(snapshot.data(), cryptoKey) : {}
+      transaction.set(ref, await encrypt({ ...current, ...patch }, cryptoKey))
+    })
+  }
   const accountName = id => rows.accounts.find(account => account.id === id)?.name || id
-  return <DataContext.Provider value={{ ...rows, uid, accountName }}>{children}</DataContext.Provider>
+  return <DataContext.Provider value={{ ...rows, preferences, savePreferences, uid, accountName }}>{children}</DataContext.Provider>
 }

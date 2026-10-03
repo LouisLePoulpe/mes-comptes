@@ -1,3 +1,5 @@
+import { budgetSummary } from '../domain/budget'
+import { trend, orderedCards } from '../domain/trend'
 import { accountMovements } from "../domain/movements"
 import { useState } from "react"
 import { useData } from "../data/context"
@@ -5,24 +7,6 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
 } from "recharts"
-
-const COULEURS_PIE = ["#3e9950", "#bc9d4a", "#5aafa0", "#8b78ad", "#cf6f68", "#82b940"]
-
-function regression(data, key) {
-  const n = data.length
-  if (n < 2) return data
-  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
-  data.forEach((d, i) => {
-    sumX += i; sumY += d[key]; sumXY += i * d[key]; sumX2 += i * i
-  })
-  const a = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
-  const b = (sumY - a * sumX) / n
-  return data.map((d, i) => ({ ...d, [`${key}_trend`]: Math.round(a * i + b) }))
-}
-
-// Variation selectors are intentionally stripped alongside emoji ranges.
-// eslint-disable-next-line no-misleading-character-class
-const stripEmojis = (str) => str?.replace(/[\u{1F000}-\u{1FFFF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{FE00}-\u{FE0F}|\u{1F900}-\u{1F9FF}|\u{1FA00}-\u{1FAFF}]/gu, "").trim() || ""
 
   const KPI = ({ label, value, color }) => (
     <div className="bg-card rounded-2xl p-4">
@@ -33,7 +17,7 @@ const stripEmojis = (str) => str?.replace(/[\u{1F000}-\u{1FFFF}|\u{2600}-\u{26FF
 
 
 export default function Dashboard() {
-  const { transactions, accounts } = useData()
+  const { transactions, accounts, categories, preferences } = useData()
   const moisCourant = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}`
   const [moisFiltre, setMoisFiltre] = useState(moisCourant)
   const [courbes, setCourbes] = useState({})
@@ -48,6 +32,7 @@ export default function Dashboard() {
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`
     if (!vus.has(key)) { vus.add(key); moisDisponibles.push(key) }
   })
+  if (!vus.has(moisCourant)) moisDisponibles.push(moisCourant)
   moisDisponibles.sort().reverse()
 
   const labelMois = (key) => {
@@ -71,11 +56,6 @@ export default function Dashboard() {
     if (t.type === "Sortie") totalSorties += t.montant
   })
 
-  // Entrées de tous les comptes pour le calcul des pourcentages
-  const entrees = filtrées
-    .filter(t => t.type === "Entrée" )
-    .reduce((sum, t) => sum + t.montant, 0)
-
   // Graphique progression
   const graphData = []
   const running = Object.fromEntries(accounts.map(a => [a.id, 0]))
@@ -83,40 +63,18 @@ export default function Dashboard() {
     for (const [id, amount] of accountMovements(t)) running[id] = (running[id] || 0) + amount
     const date = new Date(t.date).toLocaleDateString("fr-FR")
     graphData.push({
-      date,
-      ...Object.fromEntries(Object.entries(running).map(([id, value]) => [id, Math.round(value)])),
+      date, timestamp: Date.parse(t.date),
+      ...Object.fromEntries(Object.entries(running).map(([id, value]) => [id, value])),
     })
   })
 
-  // Tendances
-  const graphDataWithTrend = accounts.reduce((data, account) => regression(data, account.id), graphData)
-
-  // Camembert
-  // Pass 1 : accumuler uniquement les non-Retrait
-  const parCategorie = {}
-  filtrées
-    .filter(t => t.type === "Sortie" && !t.categorie?.includes("Retrait"))
-    .forEach(t => {
-      parCategorie[t.categorie] = (parCategorie[t.categorie] || 0) + t.montant
-    })
-
-  // Pass 2 : soustraire les Retrait de leur catégorie cible
-  filtrées
-    .filter(t => t.type === "Sortie" && t.categorie?.includes("Retrait"))
-    .forEach(t => {
-      const motsCle = stripEmojis(t.categorie).replace(/Retrait/g, "").trim()
-      const catCible = Object.keys(parCategorie).find(k => stripEmojis(k).includes(motsCle))
-      if (catCible) parCategorie[catCible] -= t.montant
-    })
-
-  // Supprimer les valeurs négatives ou nulles
-  Object.keys(parCategorie).forEach(k => {
-    if (parCategorie[k] <= 0) delete parCategorie[k]
-  })
-
-  const pieData = Object.entries(parCategorie)
-    .sort((a,b) => b[1]-a[1])
-    .map(([name, value]) => ({ name, value: Math.round(value) }))
+  // One end-of-day point per day, over the entire history.
+  let graphDataWithTrend = [...new Map(graphData.map(row=>[row.date,row])).values()]
+  const trends = {}
+  for (const account of accounts) { const result = trend(graphDataWithTrend,account.id); graphDataWithTrend = result.data; trends[account.id] = result }
+  const budget = budgetSummary(filtrées, categories)
+  const pieData = budget.groups.filter(group=>group.value > 0)
+  const money = value => value.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €'
 
   const toggleCourbe = (k) => setCourbes(c => ({ ...c, [k]: c[k] === false }))
 
@@ -141,57 +99,25 @@ export default function Dashboard() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3">
-        {accounts.map(a => <KPI key={a.id} label={a.name} value={soldes[a.id] || 0} color={(soldes[a.id] || 0) < 0 ? "text-negative" : "text-positive"} />)}
-        <KPI label="Consommation" value={totalSorties} color="text-negative" />
+        {orderedCards(accounts, preferences.cardOrder).map(id => id === 'consumption' ? <KPI key={id} label="Consommation" value={totalSorties} color="text-negative" /> : <KPI key={id} label={accounts.find(a=>a.id===id).name} value={soldes[id] || 0} color={(soldes[id] || 0) < 0 ? 'text-negative' : 'text-positive'} />)}
       </div>
-
-      {/* Camembert */}
-      {pieData.length > 0 && (
-        <div className="bg-card rounded-2xl p-4">
-          <p className="text-sm text-muted mb-3">Dépenses par catégorie</p>
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie isAnimationActive={false} data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={3}>
-                  {pieData.map((_, i) => (
-                    <Cell key={i} fill={COULEURS_PIE[i % COULEURS_PIE.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ backgroundColor: "var(--card)", color: "var(--foreground)", border: "none", borderRadius: "8px" }}
-                  formatter={(v) => `${v} €`}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex flex-col gap-2 w-full">
-              {pieData.map((entry, i) => {
-                const pct = entrees > 0 ? Math.round((entry.value / entrees) * 100) : 0
-                let couleur = "text-positive"
-                if (entry.name.includes("Charges") && pct > 50) couleur = "text-negative"
-                if (entry.name.includes("Plaisir")  && pct > 30) couleur = "text-negative"
-                if (entry.name.includes("pargne")   && pct < 20) couleur = "text-negative"
-                return (
-                  <div key={entry.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COULEURS_PIE[i % COULEURS_PIE.length] }} />
-                      <span className="text-sm">{entry.name}</span>
-                    </div>
-                    <span className={`text-sm font-semibold ${couleur}`}>
-                      {pct}% ({entry.value} €)
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      <section aria-label="Budget Charges Épargne Plaisirs" className="bg-card rounded-2xl p-4">
+        <h3 className="font-semibold mb-2">Charges, Épargne et Plaisirs</h3>
+        <p className="text-sm text-muted mb-3">Pourcentages des revenus de la période : {money(budget.income)}. Classement modifiable dans Paramètres → Catégories.</p>
+        {pieData.length > 0 ? <ResponsiveContainer width="100%" height={210}><PieChart><Pie isAnimationActive={false} data={pieData} nameKey="name" dataKey="value" innerRadius={58} outerRadius={90} paddingAngle={3}>{pieData.map(group=><Cell key={group.id} fill={group.color} />)}</Pie><Tooltip contentStyle={{backgroundColor:'var(--card)',color:'var(--foreground)',borderRadius:12}} formatter={money} /></PieChart></ResponsiveContainer> : <p className="text-muted py-8 text-center">Aucune sortie classée sur cette période.</p>}
+        <div className="space-y-3">{budget.groups.map(group=><div key={group.id} data-testid={`budget-${group.id}`} className={`flex justify-between gap-3 ${group.ok === null ? 'text-muted' : group.ok ? 'text-positive' : 'text-negative'}`}>
+          <span><span className="inline-block w-3 h-3 rounded-full mr-2" style={{backgroundColor:group.color}} />{group.name}<small className="block">Objectif {group.id === 'savings' ? '>' : '<'} {group.limit} %</small></span>
+          <span className="text-right font-semibold">{group.percent === null ? '—' : `${group.percent.toLocaleString('fr-FR',{maximumFractionDigits:1})} %`} ({money(group.value)})<small className="block font-normal">{group.ok === null ? 'Sans revenus : non calculable' : group.ok ? 'Objectif respecté' : 'Objectif non respecté'}</small></span>
+        </div>)}</div>
+        {budget.unclassified > 0 && <p className="text-sm text-muted mt-3">Sorties à classer : {money(budget.unclassified)}. Elles ne figurent pas dans les trois parts.</p>}
+        <p className="text-xs text-muted mt-3">Le disque représente la répartition des montants positifs. Les retraits diminuent l’épargne ; un montant net négatif reste indiqué dans la légende.</p>
+      </section>
 
       {/* Graphique progression */}
       {graphDataWithTrend.length > 0 && (
         <div className="bg-card rounded-2xl p-4">
           <p className="text-sm text-muted mb-3">Progression des comptes</p>
-          <div className="flex gap-2 mb-3">
+          <div className="flex flex-wrap gap-2 mb-3">
             {accounts.map(({ id: key, name, color }) => (
               <button
                 key={key}
@@ -205,11 +131,12 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
+          {preferences.showTrendValues && <div className="space-y-2 mb-3" aria-label="Valeurs de tendance">{accounts.filter(a=>courbes[a.id] !== false).map(a=><p key={a.id} className="text-sm">{a.name} : {trends[a.id]?.last == null ? 'Au moins deux dates sont nécessaires.' : `${money(trends[a.id].last)} · ${money(trends[a.id].monthly)}/mois`}</p>)}<p className="text-xs text-muted">Valeur de la droite à la dernière date et variation moyenne par mois (30,44 jours), sur tout l’historique. Ce n’est pas une prévision.</p></div>}
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={graphDataWithTrend}>
-              <XAxis dataKey="date" hide />
+              <XAxis dataKey="timestamp" type="number" domain={["dataMin", "dataMax"]} hide />
               <YAxis width={55} tick={{ fill: "var(--muted)", fontSize: 11 }} />
-              <Tooltip contentStyle={{ backgroundColor: "var(--card)", color: "var(--foreground)", border: "none", borderRadius: "8px" }} />
+              <Tooltip labelFormatter={value => new Date(value).toLocaleDateString("fr-FR")} formatter={value => money(value)} contentStyle={{ backgroundColor: "var(--card)", color: "var(--foreground)", border: "none", borderRadius: "8px" }} />
               {accounts.filter(a => courbes[a.id] !== false).map(a => <Line isAnimationActive={false} key={a.id} name={a.name} type="monotone" dataKey={a.id} stroke={a.color} dot={false} strokeWidth={2} />)}
               {accounts.filter(a => courbes[a.id] !== false).map(a => <Line isAnimationActive={false} key={`${a.id}_trend`} name={`${a.name} (tendance)`} type="monotone" dataKey={`${a.id}_trend`} stroke={a.color} dot={false} strokeWidth={1} strokeDasharray="5 5" />)}
             </LineChart>

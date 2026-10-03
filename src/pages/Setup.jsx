@@ -1,3 +1,4 @@
+import { DEFAULT_CATEGORIES } from '../domain/budget'
 import Brand from "../components/Brand"
 import { useState } from "react"
 import { db } from "../firebase"
@@ -43,10 +44,12 @@ export default function Setup({ uid, onComplete }) {
       const encrypted = await encrypt({ verif: "ok" }, key)
       const configRef = userDoc(uid, "config", "crypto")
       const verifRef = userDoc(uid, "config", "verif")
+      const defaults = await Promise.all(DEFAULT_CATEGORIES.map(async ({id,...data}) => ({ id, encrypted: await encrypt(data, key) })))
       await runTransaction(db, async transaction => {
         if ((await transaction.get(configRef)).exists()) throw new Error("Coffre déjà configuré : recharge la page")
         transaction.set(configRef, { saltHex, wrappedKey, createdAt: new Date().toISOString() })
         transaction.set(verifRef, { encrypted })
+        for (const row of defaults) transaction.set(userDoc(uid, "categories", row.id), row.encrypted)
       })
       await saveKeyLocally(key, saltHex, uid)
       onComplete(key)

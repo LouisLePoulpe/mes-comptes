@@ -1,3 +1,4 @@
+import { categoryGroup, DEFAULT_CATEGORIES } from '../domain/budget'
 import { useState } from "react"
 import { userCollection, userDoc } from "../data/references"
 import { useData } from "../data/context"
@@ -10,6 +11,7 @@ export default function Categories({ cryptoKey }) {
   const [nouvelle, setNouvelle] = useState("")
   const [enEdition, setEnEdition] = useState(null)
   const [nouveauNom, setNouveauNom] = useState("")
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
 
@@ -44,7 +46,7 @@ export default function Categories({ cryptoKey }) {
     setLoading(true)
 
     // 1. Mettre à jour la catégorie
-    const encryptedCat = await encrypt({ nom: nouveauNom.trim() }, cryptoKey)
+    const encryptedCat = await encrypt({ nom: nouveauNom.trim(), budgetGroup: categoryGroup(cat) }, cryptoKey)
     await updateDoc(userDoc(uid, "categories", cat.id), encryptedCat)
 
     // 2. Mettre à jour toutes les transactions qui utilisent cette catégorie
@@ -60,10 +62,24 @@ export default function Categories({ cryptoKey }) {
     setLoading(false)
   }
 
+  async function changeGroup(cat, budgetGroup) {
+    setLoading(true); setError('')
+    try { await updateDoc(userDoc(uid, 'categories', cat.id), await encrypt({ nom: cat.nom, budgetGroup }, cryptoKey)) }
+    catch { setError('Classement non enregistré. Réessaie.') } finally { setLoading(false) }
+  }
+  async function addDefaults() {
+    setLoading(true); setError('')
+    try { for (const { nom, budgetGroup } of DEFAULT_CATEGORIES) {
+      if (!categories.some(cat => categoryGroup(cat) === budgetGroup)) await addDoc(userCollection(uid,'categories'), await encrypt({nom,budgetGroup},cryptoKey))
+    } } catch { setError('Ajout incomplet. Tu peux réessayer.') } finally { setLoading(false) }
+  }
   return (
     <div className="max-w-md mx-auto">
       <h2 className="text-2xl font-bold mb-6">Catégories</h2>
 
+      <p className="text-sm text-muted mb-3">Classe chaque catégorie pour le budget 50 / 20 / 30. Les catégories importées reconnues sont préclassées ; « Retrait d’épargne » diminue l’épargne.</p>
+      {error && <p role="alert">{error}</p>}
+      <button disabled={loading} onClick={addDefaults} className="mb-4 text-link">Compléter les trois catégories par défaut</button>
       {loading && (
         <div className="bg-card rounded-xl p-3 mb-4 text-center text-sm text-positive">
           Mise à jour des transactions en cours...
@@ -89,7 +105,7 @@ export default function Categories({ cryptoKey }) {
 
       <div className="flex flex-col gap-2">
         {categories.map(cat => (
-          <div key={cat.id} className="flex items-center justify-between bg-card rounded-xl px-4 py-3">
+          <div key={cat.id} className="flex flex-wrap items-center justify-between gap-2 bg-card rounded-xl px-4 py-3">
             {enEdition === cat.id ? (
               <input
                 value={nouveauNom}
@@ -105,6 +121,9 @@ export default function Categories({ cryptoKey }) {
               <span className="flex-1">{cat.nom}</span>
             )}
 
+            <label className="w-full text-sm">Groupe de {cat.nom}<select aria-label={`Groupe de ${cat.nom}`} disabled={loading} className="block w-full bg-field rounded-lg p-2" value={categoryGroup(cat)} onChange={e => changeGroup(cat,e.target.value)}>
+              <option value="none">Hors budget / à classer</option><option value="charges">Charges</option><option value="savings">Épargne</option><option value="fun">Plaisirs</option><option value="savingsWithdrawal">Retrait d’épargne</option>
+            </select></label>
             <div className="flex gap-2 shrink-0">
               {enEdition === cat.id ? (
                 <>
