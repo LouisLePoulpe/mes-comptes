@@ -3,6 +3,7 @@ import { useData } from '../data/context'
 import { orderedCards } from '../domain/trend'
 import ThemeToggle from '../components/ThemeToggle'
 import Info from '../components/Info'
+import ColorPalette from '../components/ColorPalette'
 import { BUDGET_GROUPS } from '../domain/budget'
 export default function Settings({ user, onImport, onAccounts, onCategories, onDelete }) {
   const { accounts, preferences, savePreferences } = useData()
@@ -27,7 +28,9 @@ export default function Settings({ user, onImport, onAccounts, onCategories, onD
     </div>
     <div className="bg-card rounded-xl p-4 space-y-3">
       <h3 className="font-semibold flex items-center gap-2">Couleurs du camembert <Info title="Couleurs du camembert"><p>Ces couleurs servent aux trois parts du budget. La couleur du texte indique si l'objectif est respecté.</p></Info></h3>
-      <div className="grid grid-cols-3 gap-3">{BUDGET_GROUPS.map(group => <label key={group.id} className="text-sm flex items-center gap-2"><input type="color" value={view.budgetColors?.[group.id] || group.color} onChange={event => save({ budgetColors: { ...(view.budgetColors || {}), [group.id]: event.target.value } })} /><span>{group.name}</span></label>)}</div>
+      <div className="space-y-4">{BUDGET_GROUPS.map(group => <ColorPalette key={group.id} label={group.name}
+        value={view.budgetColors?.[group.id] || group.color} disabled={busy}
+        onChange={color => save({ budgetColors: { ...(view.budgetColors || {}), [group.id]: color } })} />)}</div>
     </div>
     <div className="bg-card rounded-xl p-4 space-y-2">
       <h3 className="font-semibold">Compte connecté</h3>

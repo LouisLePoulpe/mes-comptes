@@ -1,7 +1,7 @@
 export const BUDGET_GROUPS = [
-  { id: 'charges', name: 'Charges', color: '#56a477', limit: 50 },
-  { id: 'savings', name: 'Épargne', color: '#d99b4a', limit: 20 },
-  { id: 'fun', name: 'Plaisirs', color: '#648fca', limit: 30 },
+  { id: 'charges', name: 'Charges', color: '#3e9950', limit: 50 },
+  { id: 'savings', name: 'Épargne', color: '#d58b46', limit: 20 },
+  { id: 'fun', name: 'Plaisirs', color: '#598dc4', limit: 30 },
 ]
 export const categoryGroup = category => {
   if (category?.budgetGroup !== undefined) return category.budgetGroup
