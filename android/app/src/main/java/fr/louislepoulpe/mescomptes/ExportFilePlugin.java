@@ -54,6 +54,12 @@ public class ExportFilePlugin extends Plugin {
     @ActivityCallback
     private void documentChosen(PluginCall call, ActivityResult result) {
         if (call == null) return;
+        // A document provider may block while opening or closing the destination.
+        // Keep its I/O off the activity-result/UI thread.
+        bridge.execute(() -> finishExport(call, result));
+    }
+
+    private void finishExport(PluginCall call, ActivityResult result) {
         String name = call.getString("pendingExport");
         if (name == null || !name.matches("pending-export-[a-zA-Z0-9-]+\\.xlsx")) {
             call.reject("Export interrompu. Relance l’enregistrement.", "EXPORT_INTERRUPTED");
