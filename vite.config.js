@@ -4,19 +4,19 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: "/mes-comptes/",
+  base: process.env.VITE_NATIVE === "true" ? "/" : "/mes-comptes/",
   plugins: [
     react(),
     tailwindcss(),
-    VitePWA({
+    ...(process.env.VITE_NATIVE === "true" ? [] : [VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'Mes Comptes',
-        short_name: 'Comptes',
+        name: 'Poulpécule',
+        short_name: 'Poulpécule',
         description: 'Suivi de mes finances personnelles',
-        theme_color: '#111827',
-        background_color: '#111827',
+        theme_color: '#071c14',
+        background_color: '#071c14',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/mes-comptes/',
@@ -24,17 +24,17 @@ export default defineConfig({
         icons: [
           {
             src: 'pwa-192.png',
-            sizes: '192x192',
+            sizes: '1254x1254',
             type: 'image/png'
           },
           {
             src: 'pwa-512.png',
-            sizes: '512x512',
+            sizes: '1254x1254',
             type: 'image/png'
           },
           {
             src: 'pwa-512.png',
-            sizes: '512x512',
+            sizes: '1254x1254',
             type: 'image/png',
             purpose: 'any maskable'
           }
@@ -42,17 +42,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'firestore-cache',
-              networkTimeoutSeconds: 10
-            }
-          }
-        ]
+
       }
-    })
+    })])
   ],
 })

@@ -1,0 +1,22 @@
+{
+  "appId": "fr.louislepoulpe.mescomptes",
+  "appName": "Poulpécule",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#030712"
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": [
+        "google.com"
+      ]
+    }
+  },
+  "includePlugins": [
+    "@capacitor/app",
+    "@capacitor/filesystem",
+    "@capacitor/share"
+  ]
+}

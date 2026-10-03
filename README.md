@@ -1,3 +1,9 @@
+# Mes Comptes V2 (branche de développement)
+
+Fonctionnalités : [suivi V2](docs/V2-FEATURES.md). Version APK : [préparation Android](docs/ANDROID.md).
+
+Fondations et procédure de migration : [docs/V2-MIGRATION.md](docs/V2-MIGRATION.md). Les builds utilisent les émulateurs par défaut. Aucune migration en production n’est automatique.
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

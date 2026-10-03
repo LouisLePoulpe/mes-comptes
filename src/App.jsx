@@ -1,138 +1,182 @@
+import { App as NativeApp } from "@capacitor/app"
+import { Capacitor } from "@capacitor/core"
 import { useState, useEffect } from "react"
-import { auth, googleProvider, db } from "./firebase"
-import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth"
-import { doc, getDoc, setDoc } from "firebase/firestore"
-import { loadKeyLocally, clearKeyLocally, encrypt, decrypt } from "./crypto"
+import { auth } from "./firebase"
+import { onIdTokenChanged } from "firebase/auth"
+import { getDoc } from "firebase/firestore"
+import { loadKeyLocally, clearKeyLocally, decrypt } from "./crypto"
+import { userDoc } from "./data/references"
+import { logoutGoogle } from "./nativeAuth"
+import Login, { VerifyEmail } from "./components/Login"
+import Importer from "./pages/Importer"
+import DataProvider from "./data/DataProvider"
+import Brand from "./components/Brand"
+import Settings from "./pages/Settings"
+import Accounts from "./pages/Accounts"
 import Dashboard from "./pages/Dashboard"
 import Historique from "./pages/Historique"
 import Ajouter from "./pages/Ajouter"
 import Categories from "./pages/Categories"
 import Setup from "./pages/Setup"
 import Unlock from "./pages/Unlock"
-import { LayoutDashboard, History, PlusCircle, Tags, LogOut } from "lucide-react"
+import { LayoutDashboard, History, PlusCircle, LogOut, Settings as SettingsIcon } from "lucide-react"
+import { deleteCurrentAccount, deletionPending } from './accountDeletion'
 
 export default function App() {
+  return <Application />
+}
+
+function Application() {
   const [user, setUser] = useState(null)
   const [page, setPage] = useState("dashboard")
   const [loading, setLoading] = useState(true)
   const [cryptoKey, setCryptoKey] = useState(null)
   const [cryptoState, setCryptoState] = useState("checking") // "checking" | "setup" | "unlock" | "ready"
 
+  const [error, setError] = useState("")
+  const [deleting, setDeleting] = useState(false)
+  const [deletionError, setDeletionError] = useState('')
+  const [retryPassword, setRetryPassword] = useState('')
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      setUser(u)
-      if (u) {
-        await checkCryptoState()
-      } else {
-        setCryptoState("checking")
-      }
-      setLoading(false)
+    if (!Capacitor.isNativePlatform()) return
+    const handle = NativeApp.addListener('backButton', () => {
+      if (page !== 'dashboard') setPage('dashboard')
+      else NativeApp.minimizeApp()
     })
-    return unsub
+    return () => { handle.then(listener => listener.remove()) }
+  }, [page])
+
+  useEffect(() => {
+    let generation = 0
+    const unsub = onIdTokenChanged(auth, async (u) => {
+      const current = ++generation
+      setUser(u)
+      setCryptoKey(null)
+      setCryptoState("checking")
+      setError("")
+      setPage("dashboard")
+      setLoading(true)
+      if (u && deletionPending(u.uid)) { setLoading(false); return }
+      try {
+        if (u && !(u.providerData.some(provider => provider.providerId === "password") && !u.emailVerified)) {
+          const config = await getDoc(userDoc(u.uid, "config", "crypto"))
+          let key = null
+          if (config.exists()) {
+            try {
+              const local = await loadKeyLocally(u.uid)
+              const verif = await getDoc(userDoc(u.uid, "config", "verif"))
+              if (local && local.saltHex === config.data().saltHex && verif.exists() &&
+                  (await decrypt(verif.data().encrypted, local.key)).verif === "ok") key = local.key
+            } catch { clearKeyLocally(u.uid) }
+          }
+          if (current !== generation) return
+          setCryptoKey(key)
+          setCryptoState(!config.exists() ? "setup" : key ? "ready" : "unlock")
+        }
+      } catch {
+        if (current === generation) setError("Impossible de vérifier ton coffre. Vérifie la connexion et les autorisations.")
+      } finally {
+        if (current === generation) setLoading(false)
+      }
+    })
+    return () => { generation++; unsub() }
   }, [])
 
-  const checkCryptoState = async () => {
-    // Vérifier si la config crypto existe dans Firestore
-    const configDoc = await getDoc(doc(db, "config", "crypto"))
-    if (!configDoc.exists()) {
-      // Première fois — setup requis
-      setCryptoState("setup")
-      return
-    }
-
-    // Config existe — vérifier si la clé est en local
-    const localKey = await loadKeyLocally()
-    if (localKey) {
-      setCryptoKey(localKey.key)
-      setCryptoState("ready")
-    } else {
-      // Clé pas en local — demander la passphrase
-      setCryptoState("unlock")
-    }
-  }
-
-  const handleSetupComplete = async (key) => {
-    // Créer un doc de vérification chiffré
-    const encrypted = await encrypt({ verif: "ok" }, key)
-    await setDoc(doc(db, "config", "verif"), { encrypted })
+  const handleComplete = (key) => {
+    if (auth.currentUser?.uid !== user.uid) return
     setCryptoKey(key)
     setCryptoState("ready")
   }
 
-  const handleUnlockComplete = (key) => {
-    setCryptoKey(key)
-    setCryptoState("ready")
-  }
-
-  const login = () => signInWithPopup(auth, googleProvider)
   const logout = () => {
-    clearKeyLocally()
+    clearKeyLocally(user.uid)
     setCryptoKey(null)
     setCryptoState("checking")
-    signOut(auth)
+    logoutGoogle().catch(() => setError("Déconnexion incomplète. Réessaie."))
   }
+  const deleteAccount = async credentials => {
+    setDeleting(true); setDeletionError('')
+    try { await deleteCurrentAccount({ ...credentials, confirm: true }); setDeleting(false) }
+    catch (cause) { setDeleting(false); setDeletionError(cause.code ? 'Suppression interrompue. Vérifie ton mot de passe et ta connexion, puis réessaie. Les étapes déjà terminées ne peuvent pas être annulées.' : cause.message) }
+  }
+  if (deleting) return <div className="min-h-screen flex items-center justify-center bg-app text-foreground p-6 text-center">Suppression de ton compte en cours…</div>
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
+    <div className="min-h-screen flex items-center justify-center bg-app text-foreground">
       Chargement...
     </div>
   )
 
-  if (!user) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 text-white gap-6">
-      <h1 className="text-4xl font-bold text-emerald-400">💰 Mes Comptes</h1>
-      <p className="text-gray-400">Connecte-toi pour accéder à tes finances</p>
-      <button
-        onClick={login}
-        className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-8 py-3 rounded-xl transition"
-      >
-        Se connecter avec Google
-      </button>
-    </div>
-  )
+  if (!user) return <Login />
+  if (deletionError || deletionPending(user.uid)) return <section className="max-w-md mx-auto p-5 space-y-4">
+    <h2 className="text-xl font-bold">Suppression du compte</h2>
+    <p role="alert">{deletionError || 'Une suppression est en cours. Reprends-la pour supprimer les données restantes et ton accès.'}</p>
+    <p>Ferme les autres sessions de ce compte avant de poursuivre.</p>
+    <form onSubmit={event => { event.preventDefault(); deleteAccount({ password: retryPassword }) }} className="space-y-3">
+      {user.providerData.some(p => p.providerId === 'password') && <input required type="password" autoComplete="current-password" aria-label="Mot de passe actuel" value={retryPassword} onChange={e => setRetryPassword(e.target.value)} />}
+      <button type="submit">Réessayer la suppression</button>
+    </form>
+    <button onClick={() => { setDeletionError(''); logout() }}>Se déconnecter</button>
+  </section>
+  if (user.providerData.some(provider => provider.providerId === "password") && !user.emailVerified)
+    return <VerifyEmail user={user} onLogout={logout} />
+
+  if (error) return <div role="alert">{error}<button aria-label="Se déconnecter" onClick={logout}>Se déconnecter</button></div>
 
   if (cryptoState === "checking") return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
+    <div className="min-h-screen flex items-center justify-center bg-app text-foreground">
       Vérification du chiffrement...
     </div>
   )
 
-  if (cryptoState === "setup") return <Setup onComplete={handleSetupComplete} />
-  if (cryptoState === "unlock") return <Unlock onComplete={handleUnlockComplete} />
+  if (cryptoState === "setup" || cryptoState === "unlock") return (
+    <>
+      <button onClick={logout} className="fixed top-4 right-4 text-foreground z-10">Se déconnecter</button>
+      {cryptoState === "setup"
+        ? <Setup key={user.uid} uid={user.uid} onComplete={handleComplete} />
+        : <Unlock key={user.uid} uid={user.uid} onComplete={handleComplete} />}
+    </>
+  )
 
   const nav = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "historique", label: "Historique", icon: History },
     { id: "ajouter", label: "Ajouter", icon: PlusCircle },
-    { id: "categories", label: "Catégories", icon: Tags },
+    { id: "settings", label: "Paramètres", icon: SettingsIcon },
   ]
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-emerald-400">💰 Mes Comptes</h1>
+    <div className="min-h-screen bg-app text-foreground flex flex-col">
+      <header className="bg-panel border-b border-line px-5 py-3 flex items-center justify-between">
+        <h1 className="text-xl font-bold text-positive"><Brand /></h1>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-400 hidden sm:block">{user.displayName}</span>
-          <button onClick={logout} className="text-gray-400 hover:text-white transition">
+          <span className="text-sm text-muted hidden sm:block">{user.displayName || user.email}</span>
+          <button aria-label="Se déconnecter" onClick={logout} className="text-muted hover:text-foreground transition">
             <LogOut size={20} />
           </button>
         </div>
       </header>
 
-      <main className="flex-1 overflow-auto p-4 pb-20">
+      <DataProvider key={user.uid} uid={user.uid} cryptoKey={cryptoKey}>
+      <main className="app-content flex-1 p-4 pb-20">
+        {["accounts", "categories"].includes(page) && <button className="settings-back" onClick={() => setPage("settings")}>← Paramètres</button>}
         {page === "dashboard" && <Dashboard cryptoKey={cryptoKey} />}
-        {page === "historique" && <Historique cryptoKey={cryptoKey} />}
+        {page === "historique" && <Historique cryptoKey={cryptoKey} onImport={() => setPage("import")} />}
         {page === "ajouter" && <Ajouter cryptoKey={cryptoKey} onSuccess={() => setPage("historique")} />}
         {page === "categories" && <Categories cryptoKey={cryptoKey} />}
+        {page === "import" && <Importer cryptoKey={cryptoKey} onClose={() => setPage("historique")} />}
+        {page === "settings" && <Settings user={user} onAccounts={() => setPage("accounts")} onCategories={() => setPage("categories")} onImport={() => setPage("import")} onDelete={deleteAccount} />}
+        {page === "accounts" && <Accounts cryptoKey={cryptoKey} />}
       </main>
+      </DataProvider>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 flex justify-around py-2 z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-panel border-t border-line flex justify-around py-2 z-50">
         {nav.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setPage(id)}
-            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-lg transition text-xs ${
-              page === id ? "text-emerald-400" : "text-gray-500 hover:text-gray-300"
+            className={`flex flex-col items-center gap-1 px-1 sm:px-3 py-1 rounded-lg transition text-xs ${
+              (page === id || (id === "settings" && ["accounts", "categories"].includes(page))) ? "text-positive" : "text-muted hover:text-muted"
             }`}
           >
             <Icon size={22} />

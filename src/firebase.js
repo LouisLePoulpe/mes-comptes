@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCv0O8yCEC0FCdZ_6gDejrRGmY5ddIWghU",
@@ -11,16 +11,15 @@ const firebaseConfig = {
   appId: "1:1020740321083:web:81a5d2b0cd4ef316ec811e"
 };
 
-const app = initializeApp(firebaseConfig);
+const useProduction = import.meta.env.VITE_V2_USE_PRODUCTION === 'true';
+const app = initializeApp(useProduction ? firebaseConfig : { ...firebaseConfig, projectId: 'demo-mes-comptes-v2' });
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+auth.languageCode = "fr";
 export const googleProvider = new GoogleAuthProvider();
 
-// Mode offline
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code === "failed-precondition") {
-    console.warn("Offline persistence: plusieurs onglets ouverts")
-  } else if (err.code === "unimplemented") {
-    console.warn("Offline persistence: non supporté par ce navigateur")
-  }
-});
+// V2 preview defaults to local emulators. Production requires an explicit build opt-in.
+if (!useProduction) {
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099');
+}

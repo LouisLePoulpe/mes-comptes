@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Poulpécule</string>
+    <string name="title_activity_main">Poulpécule</string>
+    <string name="package_name">fr.louislepoulpe.mescomptes</string>
+    <string name="custom_url_scheme">fr.louislepoulpe.mescomptes</string>
+</resources>

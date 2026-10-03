@@ -1,49 +1,28 @@
-import { useState, useEffect } from "react"
-import { db } from "../firebase"
-import { collection, onSnapshot, query } from "firebase/firestore"
-import { decrypt } from "../crypto"
+import { budgetSummary } from '../domain/budget'
+import { trend, orderedCards } from '../domain/trend'
+import { accountMovements } from "../domain/movements"
+import { useState } from "react"
+import { useData } from "../data/context"
+import Info from "../components/Info"
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
 } from "recharts"
 
-const COULEURS_PIE = ["#10b981", "#f97316", "#60a5fa", "#a78bfa", "#f43f5e", "#facc15"]
+  const KPI = ({ label, value, color, style }) => (
+    <div className="bg-card rounded-2xl p-4">
+      <p className="text-xs text-muted mb-1">{label}</p>
+      <p className={`text-2xl font-bold ${color}`} style={style}>{value.toFixed(2)} €</p>
+    </div>
+  )
 
-function regression(data, key) {
-  const n = data.length
-  if (n < 2) return data
-  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
-  data.forEach((d, i) => {
-    sumX += i; sumY += d[key]; sumXY += i * d[key]; sumX2 += i * i
-  })
-  const a = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
-  const b = (sumY - a * sumX) / n
-  return data.map((d, i) => ({ ...d, [`${key}_trend`]: Math.round(a * i + b) }))
-}
 
-const stripEmojis = (str) => str?.replace(/[\u{1F000}-\u{1FFFF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{FE00}-\u{FE0F}|\u{1F900}-\u{1F9FF}|\u{1FA00}-\u{1FAFF}]/gu, "").trim() || ""
-
-export default function Dashboard({ cryptoKey }) {
+export default function Dashboard() {
+  const { transactions, accounts, categories, preferences } = useData()
   const moisCourant = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}`
-  const [transactions, setTransactions] = useState([])
   const [moisFiltre, setMoisFiltre] = useState(moisCourant)
-  const [courbes, setCourbes] = useState({ BB: true, CMB: true, TR: true })
+  const [courbes, setCourbes] = useState({})
 
-  useEffect(() => {
-    const q = query(collection(db, "transactions"))
-    const unsub = onSnapshot(q, async (snap) => {
-      const decrypted = await Promise.all(snap.docs.map(async d => {
-        try {
-          const data = await decrypt(d.data(), cryptoKey)
-          return { id: d.id, ...data }
-        } catch {
-          return null
-        }
-      }))
-      setTransactions(decrypted.filter(Boolean).sort((a,b) => new Date(a.date) - new Date(b.date)))
-    })
-    return unsub
-  }, [cryptoKey])
 
   // Liste des mois disponibles
   const moisDisponibles = []
@@ -54,6 +33,7 @@ export default function Dashboard({ cryptoKey }) {
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`
     if (!vus.has(key)) { vus.add(key); moisDisponibles.push(key) }
   })
+  if (!vus.has(moisCourant)) moisDisponibles.push(moisCourant)
   moisDisponibles.sort().reverse()
 
   const labelMois = (key) => {
@@ -70,74 +50,37 @@ export default function Dashboard({ cryptoKey }) {
   })
 
   // KPIs
-  const soldes = { BB: 0, CMB: 0, TR: 0 }
+  const soldes = Object.fromEntries(accounts.map(a => [a.id, 0]))
   let totalSorties = 0
   filtrées.forEach(t => {
-    const m = t.type === "Entrée" ? t.montant : -t.montant
-    soldes[t.banque] = (soldes[t.banque] || 0) + m
+    for (const [id, amount] of accountMovements(t)) soldes[id] = (soldes[id] || 0) + amount
     if (t.type === "Sortie") totalSorties += t.montant
   })
 
-  // Entrées BB uniquement pour le calcul des pourcentages
-  const entreesBB = filtrées
-    .filter(t => t.type === "Entrée" && t.banque === "BB")
-    .reduce((sum, t) => sum + t.montant, 0)
-
   // Graphique progression
   const graphData = []
-  const running = { BB: 0, CMB: 0, TR: 0 }
+  const running = Object.fromEntries(accounts.map(a => [a.id, 0]))
   transactions.forEach(t => {
-    const m = t.type === "Entrée" ? t.montant : -t.montant
-    running[t.banque] += m
+    for (const [id, amount] of accountMovements(t)) running[id] = (running[id] || 0) + amount
     const date = new Date(t.date).toLocaleDateString("fr-FR")
     graphData.push({
-      date,
-      BB: Math.round(running.BB),
-      CMB: Math.round(running.CMB),
-      TR: Math.round(running.TR),
+      date, timestamp: Date.parse(t.date),
+      ...Object.fromEntries(Object.entries(running).map(([id, value]) => [id, value])),
     })
   })
 
-  // Tendances
-  let graphDataWithTrend = regression(graphData, "BB")
-  graphDataWithTrend = regression(graphDataWithTrend, "CMB")
-  graphDataWithTrend = regression(graphDataWithTrend, "TR")
+  // One end-of-day point per day, over the entire history.
+  let graphDataWithTrend = [...new Map(graphData.map(row=>[row.date,row])).values()]
+  const trends = {}
+  for (const account of accounts) { const result = trend(graphDataWithTrend,account.id); graphDataWithTrend = result.data; trends[account.id] = result }
+  const budget = budgetSummary(filtrées, categories)
+  const budgetColors = preferences.budgetColors || {}
+  budget.groups.forEach(group => { if (/^#[0-9a-f]{6}$/i.test(budgetColors[group.id] || '')) group.color = budgetColors[group.id] })
+  const pieData = budget.groups.filter(group=>group.value > 0)
+  const money = value => value.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €'
 
-  // Camembert
-  // Pass 1 : accumuler uniquement les non-Retrait
-  const parCategorie = {}
-  filtrées
-    .filter(t => t.type === "Sortie" && !t.categorie?.includes("Retrait"))
-    .forEach(t => {
-      parCategorie[t.categorie] = (parCategorie[t.categorie] || 0) + t.montant
-    })
+  const toggleCourbe = (k) => setCourbes(c => ({ ...c, [k]: c[k] === false }))
 
-  // Pass 2 : soustraire les Retrait de leur catégorie cible
-  filtrées
-    .filter(t => t.type === "Sortie" && t.categorie?.includes("Retrait"))
-    .forEach(t => {
-      const motsCle = stripEmojis(t.categorie).replace(/Retrait/g, "").trim()
-      const catCible = Object.keys(parCategorie).find(k => stripEmojis(k).includes(motsCle))
-      if (catCible) parCategorie[catCible] -= t.montant
-    })
-
-  // Supprimer les valeurs négatives ou nulles
-  Object.keys(parCategorie).forEach(k => {
-    if (parCategorie[k] <= 0) delete parCategorie[k]
-  })
-
-  const pieData = Object.entries(parCategorie)
-    .sort((a,b) => b[1]-a[1])
-    .map(([name, value]) => ({ name, value: Math.round(value) }))
-
-  const toggleCourbe = (k) => setCourbes(c => ({ ...c, [k]: !c[k] }))
-
-  const KPI = ({ label, value, color }) => (
-    <div className="bg-gray-800 rounded-2xl p-4">
-      <p className="text-xs text-gray-400 mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${color}`}>{value.toFixed(2)} €</p>
-    </div>
-  )
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-6">
@@ -148,7 +91,7 @@ export default function Dashboard({ cryptoKey }) {
         <select
           value={moisFiltre}
           onChange={e => setMoisFiltre(e.target.value)}
-          className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+          className="bg-card border border-line rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-emerald-500"
         >
           <option value="all">Tous les mois</option>
           {moisDisponibles.map(m => (
@@ -159,87 +102,44 @@ export default function Dashboard({ cryptoKey }) {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3">
-        <KPI label="BoursoBank" value={soldes.BB} color={soldes.BB >= 0 ? "text-emerald-400" : "text-red-400"} />
-        <KPI label="Consommation" value={totalSorties} color="text-red-400" />
-        <KPI label="Crédit Mutuel" value={soldes.CMB} color="text-yellow-400" />
-        <KPI label="Trade Republic" value={soldes.TR} color="text-yellow-400" />
+        {orderedCards(accounts, preferences.cardOrder).map(id => id === 'consumption' ? <KPI key={id} label="Consommation" value={totalSorties} color="text-negative" /> : <KPI key={id} label={accounts.find(a=>a.id===id).name} value={soldes[id] || 0} color="" style={{color: accounts.find(a=>a.id===id).color}} />)}
       </div>
-
-      {/* Camembert */}
-      {pieData.length > 0 && (
-        <div className="bg-gray-800 rounded-2xl p-4">
-          <p className="text-sm text-gray-400 mb-3">Dépenses par catégorie</p>
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={3}>
-                  {pieData.map((_, i) => (
-                    <Cell key={i} fill={COULEURS_PIE[i % COULEURS_PIE.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px" }}
-                  formatter={(v) => `${v} €`}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex flex-col gap-2 w-full">
-              {pieData.map((entry, i) => {
-                const pct = entreesBB > 0 ? Math.round((entry.value / entreesBB) * 100) : 0
-                let couleur = "text-emerald-400"
-                if (entry.name.includes("Charges") && pct > 50) couleur = "text-red-400"
-                if (entry.name.includes("Plaisir")  && pct > 30) couleur = "text-red-400"
-                if (entry.name.includes("pargne")   && pct < 20) couleur = "text-red-400"
-                return (
-                  <div key={entry.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COULEURS_PIE[i % COULEURS_PIE.length] }} />
-                      <span className="text-sm">{entry.name}</span>
-                    </div>
-                    <span className={`text-sm font-semibold ${couleur}`}>
-                      {pct}% ({entry.value} €)
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      <section aria-label="Budget Charges Épargne Plaisirs" className="bg-card rounded-2xl p-4">
+        <h3 className="font-semibold mb-2 flex items-center gap-2">Charges, Épargne et Plaisirs <Info title="Répartition du budget"><p>Le camembert répartit les montants positifs de la période. Les pourcentages de la légende sont calculés sur les revenus : {money(budget.income)}. Sans revenus, ils ne sont pas calculables.</p><p>Les objectifs sont : épargne supérieure à 20 %, plaisirs inférieurs à 30 % et charges inférieures à 50 %. À la limite exacte, l’objectif n’est pas respecté. Vert signifie respecté, rouge non respecté.</p><p>Les retraits diminuent l’épargne ; un montant négatif reste visible dans la légende. Le classement et les couleurs se modifient dans Paramètres.</p></Info></h3>
+        {pieData.length > 0 ? <ResponsiveContainer width="100%" height={210}><PieChart><Pie isAnimationActive={false} data={pieData} nameKey="name" dataKey="value" innerRadius={58} outerRadius={90} paddingAngle={3}>{pieData.map(group=><Cell key={group.id} fill={group.color} />)}</Pie><Tooltip contentStyle={{backgroundColor:'var(--card)',color:'var(--foreground)',borderRadius:12}} formatter={money} /></PieChart></ResponsiveContainer> : <p className="text-muted py-8 text-center">Aucune sortie classée sur cette période.</p>}
+        <div className="space-y-3">{budget.groups.map(group=><div key={group.id} data-testid={`budget-${group.id}`} className={`flex justify-between gap-3 ${group.ok === null ? 'text-muted' : group.ok ? 'text-positive' : 'text-negative'}`}>
+          <span><span className="inline-block w-3 h-3 rounded-full mr-2" style={{backgroundColor:group.color}} />{group.name}</span>
+          <span className="text-right font-semibold">{group.percent === null ? '—' : `${group.percent.toLocaleString('fr-FR',{maximumFractionDigits:1})} %`} ({money(group.value)})</span>
+        </div>)}</div>
+        {budget.unclassified > 0 && <p className="text-sm text-muted mt-3">Sorties à classer : {money(budget.unclassified)}. Elles ne figurent pas dans les trois parts.</p>}
+      </section>
 
       {/* Graphique progression */}
       {graphDataWithTrend.length > 0 && (
-        <div className="bg-gray-800 rounded-2xl p-4">
-          <p className="text-sm text-gray-400 mb-3">Progression des comptes</p>
-          <div className="flex gap-2 mb-3">
-            {[
-              { key: "BB",  color: "bg-yellow-400" },
-              { key: "CMB", color: "bg-blue-400" },
-              { key: "TR",  color: "bg-orange-400" }
-            ].map(({ key, color }) => (
+        <div className="bg-card rounded-2xl p-4">
+          <p className="text-sm text-muted mb-3 flex items-center gap-2">Progression des comptes <Info title="Tendance"><p>Les valeurs affichées donnent la valeur de la droite à la dernière date et sa variation moyenne par mois (30,44 jours). La tendance est calculée sur tout l’historique. Elle ne constitue pas une prévision.</p></Info></p>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {accounts.map(({ id: key, name, color }) => (
               <button
                 key={key}
                 onClick={() => toggleCourbe(key)}
                 className={`flex items-center gap-1 px-3 py-1 rounded-lg text-sm font-semibold transition ${
-                  courbes[key] ? "bg-gray-700 text-white" : "bg-gray-900 text-gray-600"
+                  courbes[key] !== false ? "bg-field text-foreground" : "bg-panel text-muted"
                 }`}
               >
-                <span className={`w-2 h-2 rounded-full ${courbes[key] ? color : "bg-gray-600"}`} />
-                {key}
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                {name}
               </button>
             ))}
           </div>
+          {preferences.showTrendValues && <div className="space-y-2 mb-3" aria-label="Valeurs de tendance">{accounts.filter(a=>courbes[a.id] !== false).map(a=><p key={a.id} className="text-sm">{a.name} : {trends[a.id]?.last == null ? '—' : `${money(trends[a.id].last)} · ${money(trends[a.id].monthly)}/mois`}</p>)}</div>}
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={graphDataWithTrend}>
-              <XAxis dataKey="date" hide />
-              <YAxis width={55} tick={{ fill: "#9ca3af", fontSize: 11 }} />
-              <Tooltip contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px" }} />
-              {courbes.BB  && <Line type="monotone" dataKey="BB"  stroke="#facc15" dot={false} strokeWidth={2} />}
-              {courbes.CMB && <Line type="monotone" dataKey="CMB" stroke="#60a5fa" dot={false} strokeWidth={2} />}
-              {courbes.TR  && <Line type="monotone" dataKey="TR"  stroke="#f97316" dot={false} strokeWidth={2} />}
-              {courbes.BB  && <Line type="monotone" dataKey="BB_trend"  stroke="#facc15" dot={false} strokeWidth={1} strokeDasharray="5 5" />}
-              {courbes.CMB && <Line type="monotone" dataKey="CMB_trend" stroke="#60a5fa" dot={false} strokeWidth={1} strokeDasharray="5 5" />}
-              {courbes.TR  && <Line type="monotone" dataKey="TR_trend"  stroke="#f97316" dot={false} strokeWidth={1} strokeDasharray="5 5" />}
+              <XAxis dataKey="timestamp" type="number" domain={["dataMin", "dataMax"]} hide />
+              <YAxis width={55} tick={{ fill: "var(--muted)", fontSize: 11 }} />
+              <Tooltip labelFormatter={value => new Date(value).toLocaleDateString("fr-FR")} formatter={value => money(value)} contentStyle={{ backgroundColor: "var(--card)", color: "var(--foreground)", border: "none", borderRadius: "8px" }} />
+              {accounts.filter(a => courbes[a.id] !== false).map(a => <Line isAnimationActive={false} key={a.id} name={a.name} type="monotone" dataKey={a.id} stroke={a.color} dot={false} strokeWidth={2} />)}
+              {accounts.filter(a => courbes[a.id] !== false).map(a => <Line isAnimationActive={false} key={`${a.id}_trend`} name={`${a.name} (tendance)`} type="monotone" dataKey={`${a.id}_trend`} stroke={a.color} dot={false} strokeWidth={1} strokeDasharray="5 5" />)}
             </LineChart>
           </ResponsiveContainer>
         </div>
