@@ -105,7 +105,7 @@ export default function Dashboard() {
         {orderedCards(accounts, preferences.cardOrder).map(id => id === 'consumption' ? <KPI key={id} label="Consommation" value={totalSorties} color="text-negative" /> : <KPI key={id} label={accounts.find(a=>a.id===id).name} value={soldes[id] || 0} color="" style={{color: accounts.find(a=>a.id===id).color}} />)}
       </div>
       <section aria-label="Budget Charges Épargne Plaisirs" className="bg-card rounded-2xl p-4">
-        <h3 className="font-semibold mb-2 flex items-center gap-2">Charges, Épargne et Plaisirs <Info title="Répartition du budget"><p>Le camembert répartit les montants positifs de la période selon le classement des catégories.</p><p>Les objectifs sont : épargne supérieure à 20 %, plaisirs inférieurs à 30 % et charges inférieures à 50 %. Tu peux modifier le classement et les couleurs dans Paramètres.</p></Info></h3>
+        <h3 className="font-semibold mb-2 flex items-center gap-2">Charges, Épargne et Plaisirs <Info title="Répartition du budget"><p>Le camembert répartit les montants positifs de la période. Les pourcentages de la légende sont calculés sur les revenus : {money(budget.income)}. Sans revenus, ils ne sont pas calculables.</p><p>Les objectifs sont : épargne supérieure à 20 %, plaisirs inférieurs à 30 % et charges inférieures à 50 %. À la limite exacte, l’objectif n’est pas respecté. Vert signifie respecté, rouge non respecté.</p><p>Les retraits diminuent l’épargne ; un montant négatif reste visible dans la légende. Le classement et les couleurs se modifient dans Paramètres.</p></Info></h3>
         {pieData.length > 0 ? <ResponsiveContainer width="100%" height={210}><PieChart><Pie isAnimationActive={false} data={pieData} nameKey="name" dataKey="value" innerRadius={58} outerRadius={90} paddingAngle={3}>{pieData.map(group=><Cell key={group.id} fill={group.color} />)}</Pie><Tooltip contentStyle={{backgroundColor:'var(--card)',color:'var(--foreground)',borderRadius:12}} formatter={money} /></PieChart></ResponsiveContainer> : <p className="text-muted py-8 text-center">Aucune sortie classée sur cette période.</p>}
         <div className="space-y-3">{budget.groups.map(group=><div key={group.id} data-testid={`budget-${group.id}`} className={`flex justify-between gap-3 ${group.ok === null ? 'text-muted' : group.ok ? 'text-positive' : 'text-negative'}`}>
           <span><span className="inline-block w-3 h-3 rounded-full mr-2" style={{backgroundColor:group.color}} />{group.name}</span>
@@ -117,7 +117,7 @@ export default function Dashboard() {
       {/* Graphique progression */}
       {graphDataWithTrend.length > 0 && (
         <div className="bg-card rounded-2xl p-4">
-          <p className="text-sm text-muted mb-3 flex items-center gap-2">Progression des comptes <Info title="Tendance"><p>La tendance est calculée sur tout l’historique et indique la variation moyenne par mois. Elle ne constitue pas une prévision.</p></Info></p>
+          <p className="text-sm text-muted mb-3 flex items-center gap-2">Progression des comptes <Info title="Tendance"><p>Les valeurs affichées donnent la valeur de la droite à la dernière date et sa variation moyenne par mois (30,44 jours). La tendance est calculée sur tout l’historique. Elle ne constitue pas une prévision.</p></Info></p>
           <div className="flex flex-wrap gap-2 mb-3">
             {accounts.map(({ id: key, name, color }) => (
               <button

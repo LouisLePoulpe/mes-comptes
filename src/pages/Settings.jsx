@@ -18,7 +18,7 @@ export default function Settings({ user, onImport, onAccounts, onCategories, onD
   return <section className="max-w-2xl mx-auto space-y-5">
     <h2 className="text-2xl font-bold">Paramètres</h2>
     <div className="settings-grid"><button className="settings-tile" onClick={onAccounts}><strong>Comptes</strong><span>Mes banques et leurs couleurs →</span></button><button className="settings-tile" onClick={onCategories}><strong>Catégories</strong><span>Organiser mes opérations →</span></button></div>
-    <div className="bg-card rounded-xl p-4 flex flex-wrap gap-3 items-center justify-between"><div><h3 className="font-semibold">Apparence</h3><p className="text-sm text-muted">Choisis le mode qui te convient.</p></div><ThemeToggle /></div>
+    <div className="bg-card rounded-xl p-4 flex flex-wrap gap-3 items-center justify-between"><h3 className="font-semibold">Apparence</h3><ThemeToggle /></div>
     <div className="bg-card rounded-xl p-4 space-y-3">
       <h3 className="font-semibold flex items-center gap-2">Disposition du Dashboard <Info title="Disposition"><p>Les cartes apparaissent dans cet ordre, de gauche à droite puis de haut en bas.</p></Info></h3>
       {error && <p role="alert">{error}</p>}
@@ -35,14 +35,12 @@ export default function Settings({ user, onImport, onAccounts, onCategories, onD
       <p className="text-sm text-muted break-all">Identifiant : {user.uid}</p>
     </div>
     <div className="bg-card rounded-xl p-4 space-y-3">
-      <h3 className="font-semibold">Reprendre un ancien historique</h3>
-      <p>Crée ton nouveau compte avec ta nouvelle adresse, puis importe l’export complet de l’ancien compte. Garde l’ancien compte et le fichier jusqu’à la fin des vérifications.</p>
+      <h3 className="font-semibold">Reprendre un ancien historique <Info title="Import et vérification"><p>Importe l’export complet de l’ancien compte et conserve cet ancien compte jusqu’à la fin des vérifications. La comparaison porte sur les transactions du fichier ; elle ne prouve pas que le fichier contient tout l’ancien historique.</p></Info></h3>
       <button className="bg-blue-600 text-white rounded px-4 py-2" onClick={onImport}>Importer ou vérifier un export</button>
-      <p className="text-sm text-muted">La comparaison vérifie les transactions contenues dans le fichier. Elle ne prouve pas que l’export de départ contient tout l’ancien historique. Aucune suppression de compte n’est effectuée ici.</p>
     </div>
     <div className="bg-card rounded-xl p-4 space-y-3 border border-negative">
       <h3 className="font-semibold text-negative">Supprimer le compte</h3>
-      <p className="text-sm text-muted">Cette action supprime les données V2 de ce compte puis son accès Firebase. Elle est définitive.</p>
+      <p className="text-sm text-muted">Cette action est définitive : opérations, comptes bancaires, catégories, paramètres et accès seront supprimés. Ferme les autres sessions et conserve un export si nécessaire.</p>
       {!deleteOpen ? <button className="rounded px-4 py-2 bg-negative text-white" onClick={() => setDeleteOpen(true)}>Supprimer définitivement</button> : <form className="space-y-3" onSubmit={event => { event.preventDefault(); onDelete({ password: deletePassword }); }}>
         {user.providerData.some(provider => provider.providerId === 'password') && <input type="password" required value={deletePassword} onChange={event => setDeletePassword(event.target.value)} placeholder="Mot de passe actuel" aria-label="Mot de passe actuel" className="bg-field rounded p-2 w-full" />}
         <label className="flex gap-2 items-start text-sm"><input type="checkbox" required /> Je comprends que mes données seront supprimées définitivement.</label>

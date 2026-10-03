@@ -71,3 +71,5 @@ input, select, textarea { min-height: 44px; }
 .settings-tile:hover { background: var(--field); }
 .settings-back { display: block; margin: 0 auto 1rem; padding: .5rem 1rem; border-radius: 2rem; background: var(--field); }
 @media (max-width: 480px) { .brand img { width: 42px; height: 42px; } .brand small { font-size: .58rem; } .settings-grid { grid-template-columns: 1fr; } .app-content { padding-top: 1.2rem; } }
+dialog.info-dialog { margin: auto; width: calc(100% - 2rem); max-height: 85dvh; overflow: auto; }
+dialog.info-dialog::backdrop { background: rgb(0 0 0 / 45%); }

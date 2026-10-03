@@ -20,7 +20,7 @@ import Categories from "./pages/Categories"
 import Setup from "./pages/Setup"
 import Unlock from "./pages/Unlock"
 import { LayoutDashboard, History, PlusCircle, LogOut, Settings as SettingsIcon } from "lucide-react"
-import { deleteCurrentAccount } from './accountDeletion'
+import { deleteCurrentAccount, deletionPending } from './accountDeletion'
 
 export default function App() {
   return <Application />
@@ -35,6 +35,8 @@ function Application() {
 
   const [error, setError] = useState("")
   const [deleting, setDeleting] = useState(false)
+  const [deletionError, setDeletionError] = useState('')
+  const [retryPassword, setRetryPassword] = useState('')
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
     const handle = NativeApp.addListener('backButton', () => {
@@ -54,6 +56,7 @@ function Application() {
       setError("")
       setPage("dashboard")
       setLoading(true)
+      if (u && deletionPending(u.uid)) { setLoading(false); return }
       try {
         if (u && !(u.providerData.some(provider => provider.providerId === "password") && !u.emailVerified)) {
           const config = await getDoc(userDoc(u.uid, "config", "crypto"))
@@ -92,9 +95,9 @@ function Application() {
     logoutGoogle().catch(() => setError("Déconnexion incomplète. Réessaie."))
   }
   const deleteAccount = async credentials => {
-    setDeleting(true); setError('')
-    try { await deleteCurrentAccount({ ...credentials, confirm: true }) }
-    catch (cause) { setDeleting(false); setError(cause?.code === 'auth/wrong-password' ? 'Mot de passe incorrect.' : cause?.message || 'Suppression impossible.') }
+    setDeleting(true); setDeletionError('')
+    try { await deleteCurrentAccount({ ...credentials, confirm: true }); setDeleting(false) }
+    catch (cause) { setDeleting(false); setDeletionError(cause.code ? 'Suppression interrompue. Vérifie ton mot de passe et ta connexion, puis réessaie. Les étapes déjà terminées ne peuvent pas être annulées.' : cause.message) }
   }
   if (deleting) return <div className="min-h-screen flex items-center justify-center bg-app text-foreground p-6 text-center">Suppression de ton compte en cours…</div>
 
@@ -105,6 +108,16 @@ function Application() {
   )
 
   if (!user) return <Login />
+  if (deletionError || deletionPending(user.uid)) return <section className="max-w-md mx-auto p-5 space-y-4">
+    <h2 className="text-xl font-bold">Suppression du compte</h2>
+    <p role="alert">{deletionError || 'Une suppression est en cours. Reprends-la pour supprimer les données restantes et ton accès.'}</p>
+    <p>Ferme les autres sessions de ce compte avant de poursuivre.</p>
+    <form onSubmit={event => { event.preventDefault(); deleteAccount({ password: retryPassword }) }} className="space-y-3">
+      {user.providerData.some(p => p.providerId === 'password') && <input required type="password" autoComplete="current-password" aria-label="Mot de passe actuel" value={retryPassword} onChange={e => setRetryPassword(e.target.value)} />}
+      <button type="submit">Réessayer la suppression</button>
+    </form>
+    <button onClick={() => { setDeletionError(''); logout() }}>Se déconnecter</button>
+  </section>
   if (user.providerData.some(provider => provider.providerId === "password") && !user.emailVerified)
     return <VerifyEmail user={user} onLogout={logout} />
 

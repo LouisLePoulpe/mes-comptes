@@ -3,6 +3,7 @@ import { addDoc, updateDoc } from 'firebase/firestore'
 import { useData } from '../data/context'
 import { userCollection, userDoc } from '../data/references'
 import { encrypt } from '../crypto'
+import Info from '../components/Info'
 
 export default function Accounts({ cryptoKey }) {
   const { uid, accounts } = useData()
@@ -25,8 +26,7 @@ export default function Accounts({ cryptoKey }) {
     finally { setBusy(false) }
   }
   return <div className="max-w-md mx-auto space-y-4">
-    <h2 className="text-2xl font-bold">Mes comptes</h2>
-    <p>Les noms et couleurs peuvent changer sans modifier l’historique.</p>
+    <h2 className="text-2xl font-bold">Mes comptes <Info title="Comptes"><p>Les noms et couleurs peuvent changer sans modifier l’historique.</p></Info></h2>
     <form onSubmit={save} className="flex flex-wrap gap-2">
       <input aria-label="Nom du compte" required maxLength={100} value={name} onChange={e => setName(e.target.value)} className="bg-card rounded p-2" placeholder="Nom du compte" />
       <fieldset className="w-full"><legend className="text-sm mb-2">Palette du compte</legend><div className="flex flex-wrap gap-2">{[['Rouge','#c65f5b'],['Orange','#d58b46'],['Jaune','#b59a35'],['Vert','#3e9950'],['Bleu','#598dc4'],['Violet','#9471b7'],['Rose','#c8779c'],['Marron','#96745b']].map(([label,hex]) => <button type="button" key={hex} aria-label={label} title={label} aria-pressed={color === hex} onClick={() => setColor(hex)} className="w-10 h-10 rounded-full border-2" style={{backgroundColor:hex,borderColor:color === hex ? 'var(--foreground)' : 'transparent'}}>{color === hex ? '✓' : ''}</button>)}</div></fieldset>

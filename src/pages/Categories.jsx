@@ -1,4 +1,5 @@
 import { categoryGroup, DEFAULT_CATEGORIES } from '../domain/budget'
+import Info from '../components/Info'
 import { useState } from "react"
 import { userCollection, userDoc } from "../data/references"
 import { useData } from "../data/context"
@@ -77,7 +78,7 @@ export default function Categories({ cryptoKey }) {
     <div className="max-w-md mx-auto">
       <h2 className="text-2xl font-bold mb-6">Catégories</h2>
 
-      <p className="text-sm text-muted mb-3">Classe chaque catégorie pour le budget 50 / 20 / 30. Les catégories importées reconnues sont préclassées ; « Retrait d’épargne » diminue l’épargne.</p>
+      <Info title="Classement des catégories"><p>Classe chaque catégorie pour le budget 50 / 20 / 30. Les catégories importées reconnues sont préclassées ; « Retrait d’épargne » diminue l’épargne.</p></Info>
       {error && <p role="alert">{error}</p>}
       <button disabled={loading} onClick={addDefaults} className="mb-4 text-link">Compléter les trois catégories par défaut</button>
       {loading && (
