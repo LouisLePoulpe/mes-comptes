@@ -2,7 +2,7 @@ name: V2 checks
 on:
   pull_request:
   push:
-    branches: [feat/v2-foundations]
+    branches: [main, feat/v2-foundations]
 permissions:
   contents: read
 jobs:
