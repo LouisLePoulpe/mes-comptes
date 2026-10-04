@@ -4,7 +4,7 @@ import { useState } from "react"
 import { db } from "../firebase"
 import { userDoc } from "../data/references"
 import { runTransaction } from "firebase/firestore"
-import { deriveKey, generateRecoveryKey, saveKeyLocally, encrypt } from "../crypto"
+import { deriveKey, generateRecoveryKey, saveKeyLocally, saveVaultMetadataLocally, encrypt } from "../crypto"
 import { Eye, EyeOff, Copy, Check } from "lucide-react"
 
 export default function Setup({ uid, onComplete }) {
@@ -52,6 +52,7 @@ export default function Setup({ uid, onComplete }) {
         for (const row of defaults) transaction.set(userDoc(uid, "categories", row.id), row.encrypted)
       })
       await saveKeyLocally(key, saltHex, uid)
+      saveVaultMetadataLocally(uid, { saltHex, wrappedKey, encrypted: encrypted })
       onComplete(key)
     } catch (e) {
       setError("Erreur lors de la création : " + e.message)

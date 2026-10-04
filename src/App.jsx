@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { auth } from "./firebase"
 import { onIdTokenChanged } from "firebase/auth"
 import { getDoc } from "firebase/firestore"
-import { loadKeyLocally, clearKeyLocally, decrypt } from "./crypto"
+import { loadKeyLocally, loadVaultMetadataLocally, clearKeyLocally, decrypt } from "./crypto"
 import { userDoc } from "./data/references"
 import { logoutGoogle } from "./nativeAuth"
 import Login, { VerifyEmail } from "./components/Login"
@@ -59,12 +59,20 @@ function Application() {
       if (u && deletionPending(u.uid)) { setLoading(false); return }
       try {
         if (u && !(u.providerData.some(provider => provider.providerId === "password") && !u.emailVerified)) {
-          const config = await getDoc(userDoc(u.uid, "config", "crypto"))
+          let config
+          let verif
+          try {
+            config = await getDoc(userDoc(u.uid, "config", "crypto"))
+            verif = await getDoc(userDoc(u.uid, "config", "verif"))
+          } catch {
+            const local = loadVaultMetadataLocally(u.uid)
+            config = local ? { exists: () => true, data: () => local } : { exists: () => false }
+            verif = local?.encrypted ? { exists: () => true, data: () => ({ encrypted: local.encrypted }) } : { exists: () => false }
+          }
           let key = null
           if (config.exists()) {
             try {
               const local = await loadKeyLocally(u.uid)
-              const verif = await getDoc(userDoc(u.uid, "config", "verif"))
               if (local && local.saltHex === config.data().saltHex && verif.exists() &&
                   (await decrypt(verif.data().encrypted, local.key)).verif === "ok") key = local.key
             } catch { clearKeyLocally(u.uid) }

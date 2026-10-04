@@ -2,7 +2,7 @@ import Brand from "../components/Brand"
 import { useState } from "react"
 import { userDoc } from "../data/references"
 import { getDoc } from "firebase/firestore"
-import { deriveKey, saveKeyLocally, decrypt } from "../crypto"
+import { deriveKey, saveKeyLocally, loadVaultMetadataLocally, decrypt } from "../crypto"
 import { Eye, EyeOff } from "lucide-react"
 
 export default function Unlock({ uid, onComplete }) {
@@ -18,7 +18,11 @@ export default function Unlock({ uid, onComplete }) {
     setError("")
     try {
       // Récupérer le salt depuis Firestore
-      const configDoc = await getDoc(userDoc(uid, "config", "crypto"))
+      let configDoc
+      try { configDoc = await getDoc(userDoc(uid, "config", "crypto")) } catch {
+        const local = loadVaultMetadataLocally(uid)
+        configDoc = local ? { exists: () => true, data: () => local } : { exists: () => false }
+      }
       if (!configDoc.exists()) throw new Error("Configuration introuvable")
       const { saltHex } = configDoc.data()
 
@@ -27,7 +31,11 @@ export default function Unlock({ uid, onComplete }) {
 
       // Vérifier que la clé est correcte en tentant de déchiffrer un doc test
       // On stocke un petit doc de vérification lors du setup
-      const verifDoc = await getDoc(userDoc(uid, "config", "verif"))
+      let verifDoc
+      try { verifDoc = await getDoc(userDoc(uid, "config", "verif")) } catch {
+        const local = loadVaultMetadataLocally(uid)
+        verifDoc = local?.encrypted ? { exists: () => true, data: () => ({ encrypted: local.encrypted }) } : { exists: () => false }
+      }
       if (!verifDoc.exists()) throw new Error("Document de vérification manquant : restauration requise")
       if (verifDoc.exists()) {
         const { encrypted } = verifDoc.data()
@@ -50,14 +58,22 @@ export default function Unlock({ uid, onComplete }) {
     setLoading(true)
     setError("")
     try {
-      const configDoc = await getDoc(userDoc(uid, "config", "crypto"))
+      let configDoc
+      try { configDoc = await getDoc(userDoc(uid, "config", "crypto")) } catch {
+        const local = loadVaultMetadataLocally(uid)
+        configDoc = local ? { exists: () => true, data: () => local } : { exists: () => false }
+      }
       if (!configDoc.exists()) throw new Error("Configuration introuvable")
       const { saltHex, wrappedKey } = configDoc.data()
       if (!wrappedKey) throw new Error("La récupération V1 ne contient pas la clé de chiffrement. Utilise ta passphrase d’origine ou un appareil déjà déverrouillé.")
       const { key: recoveryDerived } = await deriveKey(recoveryKey.trim(), saltHex)
       const raw = await decrypt(wrappedKey, recoveryDerived)
       const key = await crypto.subtle.importKey("raw", new Uint8Array(raw), "AES-GCM", true, ["encrypt", "decrypt"])
-      const verif = await getDoc(userDoc(uid, "config", "verif"))
+      let verif
+      try { verif = await getDoc(userDoc(uid, "config", "verif")) } catch {
+        const local = loadVaultMetadataLocally(uid)
+        verif = local?.encrypted ? { exists: () => true, data: () => ({ encrypted: local.encrypted }) } : { exists: () => false }
+      }
       if (!verif.exists() || (await decrypt(verif.data().encrypted, key)).verif !== "ok") throw new Error("Vérification impossible")
       await saveKeyLocally(key, saltHex, uid)
       onComplete(key)

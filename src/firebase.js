@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
 
 const firebaseConfig = {
@@ -13,7 +13,11 @@ const firebaseConfig = {
 
 const useProduction = import.meta.env.VITE_V2_USE_PRODUCTION === 'true';
 const app = initializeApp(useProduction ? firebaseConfig : { ...firebaseConfig, projectId: 'demo-mes-comptes-v2' });
-export const db = getFirestore(app);
+// Keep the complete encrypted Firestore cache on the device. Firestore queues
+// writes while offline and flushes them automatically when connectivity returns.
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+});
 export const auth = getAuth(app);
 auth.languageCode = "fr";
 export const googleProvider = new GoogleAuthProvider();
