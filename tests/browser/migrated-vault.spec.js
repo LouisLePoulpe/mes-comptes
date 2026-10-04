@@ -3,7 +3,7 @@ import { initializeTestEnvironment } from '@firebase/rules-unit-testing'
 import { doc, setDoc, getDoc, getDocs, collection, runTransaction } from 'firebase/firestore'
 import { deriveKey, encrypt } from '../../src/crypto.js'
 import { planMigration, copyMigration } from '../../scripts/migration-plan.mjs'
-import { login, navigate } from './helpers'
+import { login, navigate, logout } from './helpers'
 
 test('un historique V1 copié se déverrouille avec sa passphrase et conserve ses sources', async ({ page }, info) => {
   await page.goto('./')
@@ -67,11 +67,11 @@ test('un historique V1 copié se déverrouille avec sa passphrase et conserve se
       await setDoc(doc(context.firestore(), `users/${uid}/transactions/${source.transactions[0].id}`), source.transactions[0].data)
     })
     await expect(page.getByText('2 transactions', { exact: true })).toBeVisible()
-    await page.getByRole('button', { name: 'Se déconnecter' }).click()
+    await logout(page)
     await login(page, `legacy-${info.project.name}@example.test`, true)
     // Users can also leave a locked vault without entering its passphrase.
     await expect(page.getByText('Entre ta passphrase pour accéder à tes données')).toBeVisible()
-    await page.getByRole('button', { name: 'Se déconnecter' }).click()
+    await logout(page)
     await expect(page.getByRole('button', { name: 'Se connecter avec Google' })).toBeVisible()
     await env.withSecurityRulesDisabled(async context => {
       for (const row of source.transactions) expect((await getDoc(doc(context.firestore(), `transactions/${row.id}`))).data()).toEqual(row.data)

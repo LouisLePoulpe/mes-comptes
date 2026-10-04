@@ -4,6 +4,7 @@ import { accountMovements } from "../domain/movements"
 import { useState } from "react"
 import { useData } from "../data/context"
 import Info from "../components/Info"
+import SyncStatus from '../components/SyncStatus'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -87,7 +88,7 @@ export default function Dashboard() {
 
       {/* Header + filtre mois */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Dashboard</h2>
+        <div className="flex items-center gap-2"><h2 className="text-2xl font-bold mb-0">Dashboard</h2><SyncStatus /></div>
         <select
           value={moisFiltre}
           onChange={e => setMoisFiltre(e.target.value)}

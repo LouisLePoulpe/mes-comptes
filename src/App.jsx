@@ -10,7 +10,6 @@ import { logoutGoogle } from "./nativeAuth"
 import Login, { VerifyEmail } from "./components/Login"
 import Importer from "./pages/Importer"
 import DataProvider from "./data/DataProvider"
-import Brand from "./components/Brand"
 import Settings from "./pages/Settings"
 import Accounts from "./pages/Accounts"
 import Dashboard from "./pages/Dashboard"
@@ -19,7 +18,7 @@ import Ajouter from "./pages/Ajouter"
 import Categories from "./pages/Categories"
 import Setup from "./pages/Setup"
 import Unlock from "./pages/Unlock"
-import { LayoutDashboard, History, PlusCircle, LogOut, Settings as SettingsIcon } from "lucide-react"
+import { LayoutDashboard, History, PlusCircle, Settings as SettingsIcon } from "lucide-react"
 import { deleteCurrentAccount, deletionPending } from './accountDeletion'
 
 export default function App() {
@@ -153,16 +152,6 @@ function Application() {
 
   return (
     <div className="min-h-screen bg-app text-foreground flex flex-col">
-      <header className="bg-panel border-b border-line px-5 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-positive"><Brand /></h1>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-muted hidden sm:block">{user.displayName || user.email}</span>
-          <button aria-label="Se déconnecter" onClick={logout} className="text-muted hover:text-foreground transition">
-            <LogOut size={20} />
-          </button>
-        </div>
-      </header>
-
       <DataProvider key={user.uid} uid={user.uid} cryptoKey={cryptoKey}>
       <main className="app-content flex-1 p-4 pb-20">
         {["accounts", "categories"].includes(page) && <button className="settings-back" onClick={() => setPage("settings")}>← Paramètres</button>}
@@ -171,22 +160,22 @@ function Application() {
         {page === "ajouter" && <Ajouter cryptoKey={cryptoKey} onSuccess={() => setPage("historique")} />}
         {page === "categories" && <Categories cryptoKey={cryptoKey} />}
         {page === "import" && <Importer cryptoKey={cryptoKey} onClose={() => setPage("settings")} />}
-        {page === "settings" && <Settings user={user} onAccounts={() => setPage("accounts")} onCategories={() => setPage("categories")} onImport={() => setPage("import")} onDelete={deleteAccount} />}
+        {page === "settings" && <Settings user={user} onLogout={logout} onAccounts={() => setPage("accounts")} onCategories={() => setPage("categories")} onImport={() => setPage("import")} onDelete={deleteAccount} />}
         {page === "accounts" && <Accounts cryptoKey={cryptoKey} />}
       </main>
       </DataProvider>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-panel border-t border-line flex justify-around py-2 z-50">
+      <nav className="app-nav fixed left-0 right-0 bg-panel border-line flex items-center justify-around z-50">
         {nav.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setPage(id)}
-            className={`flex flex-col items-center gap-1 px-1 sm:px-3 py-1 rounded-lg transition text-xs ${
+            className={`flex flex-col items-center justify-center gap-1 px-1 sm:px-3 py-1 rounded-lg transition text-xs ${
               (page === id || (id === "settings" && ["accounts", "categories"].includes(page))) ? "text-positive" : "text-muted hover:text-muted"
             }`}
           >
-            <Icon size={22} />
-            {label}
+            <Icon size={22} aria-hidden="true" />
+            <span>{label}</span>
           </button>
         ))}
       </nav>

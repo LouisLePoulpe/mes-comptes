@@ -6,7 +6,10 @@ import ThemeToggle from '../components/ThemeToggle'
 import Info from '../components/Info'
 import ColorPalette from '../components/ColorPalette'
 import { BUDGET_GROUPS } from '../domain/budget'
-export default function Settings({ user, onImport, onAccounts, onCategories, onDelete }) {
+import Brand from '../components/Brand'
+import { LogOut } from 'lucide-react'
+import { version } from '../../package.json'
+export default function Settings({ user, onImport, onAccounts, onCategories, onDelete, onLogout }) {
   const { accounts, preferences, savePreferences } = useData()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -37,12 +40,18 @@ export default function Settings({ user, onImport, onAccounts, onCategories, onD
       <h3 className="font-semibold">Compte connecté</h3>
       <p>Adresse e-mail : <span className="break-all">{user.email || 'Non renseignée'}</span></p>
       <p className="text-sm text-muted break-all">Identifiant : {user.uid}</p>
+      <button onClick={onLogout} className="inline-flex items-center gap-2 bg-field rounded-xl px-4 py-2"><LogOut size={18} aria-hidden="true" />Se déconnecter</button>
     </div>
     <div className="bg-card rounded-xl p-4 space-y-3">
       <h3 className="font-semibold">Import et export <Info title="Import et vérification"><p>Importe l’export complet de l’ancien compte et conserve cet ancien compte jusqu’à la fin des vérifications. La comparaison porte sur les transactions du fichier ; elle ne prouve pas que le fichier contient tout l’ancien historique.</p></Info></h3>
       <button className="bg-blue-600 text-white rounded px-4 py-2" onClick={onImport}>Importer ou vérifier un export</button>
       <ExportActions />
     </div>
+    <section aria-label="À propos" className="bg-card rounded-xl p-4 space-y-3">
+      <h3 className="font-semibold">À propos</h3>
+      <div className="text-xl font-bold"><Brand /></div>
+      <p className="text-sm text-muted">Version {version}</p>
+    </section>
     <div className="bg-card rounded-xl p-4 space-y-3 border border-negative">
       <h3 className="font-semibold text-negative">Supprimer le compte</h3>
       <p className="text-sm text-muted">Cette action est définitive : opérations, comptes bancaires, catégories, paramètres et accès seront supprimés. Ferme les autres sessions et conserve un export si nécessaire.</p>

@@ -33,3 +33,7 @@ export async function navigate(page, name) {
   } else await page.getByRole('navigation').getByRole('button', { name, exact: true }).click()
 }
 
+export async function logout(page) {
+  if (await page.getByRole('navigation').isVisible()) await navigate(page, 'Paramètres')
+  await page.getByRole('button', { name: 'Se déconnecter', exact: true }).click()
+}

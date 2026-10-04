@@ -67,8 +67,8 @@ export default function DataProvider({ uid, cryptoKey, children }) {
   const accountName = id => rows.accounts.find(account => account.id === id)?.name || id
   const pending = COLLECTIONS.some(name => data[name].pending)
   const cached = COLLECTIONS.some(name => data[name].cached)
-  return <DataContext.Provider value={{ ...rows, preferences, savePreferences, uid, accountName }}>
-    <p aria-live="polite" aria-label="Synchronisation" className="text-sm text-muted mb-3">{!online ? (pending ? 'Hors connexion · modifications enregistrées sur cet appareil, en attente de synchronisation.' : 'Hors connexion · historique disponible sur cet appareil.') : pending ? 'Modifications enregistrées sur cet appareil · synchronisation en cours…' : cached ? 'Vérification de la synchronisation…' : 'Synchronisé'}</p>
+  const syncState = !online ? 'offline' : pending || cached ? 'syncing' : 'synced'
+  return <DataContext.Provider value={{ ...rows, preferences, savePreferences, uid, accountName, syncState, pending }}>
     {syncError && <p role="alert">Le serveur a refusé une modification. Vérifie ton historique et exporte tes données avant de te déconnecter.</p>}
     {children}
   </DataContext.Provider>

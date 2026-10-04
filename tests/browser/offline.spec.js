@@ -12,15 +12,17 @@ test('offline cold start, edits, persistent queue and server reconciliation', as
   await page.getByLabel('Nom du compte').fill('Compte hors ligne')
   await page.getByRole('main').getByRole('button', { name: 'Ajouter', exact: true }).click()
   await expect(page.getByText('Compte hors ligne', { exact: true })).toBeVisible()
-  await expect(page.getByLabel('Synchronisation', { exact: true })).toHaveText('Synchronisé')
+  await navigate(page, 'Dashboard')
+  await expect(page.getByRole('button', { name: 'Synchronisation : Synchronisé', exact: true })).toBeVisible()
+  await page.screenshot({ path: info.outputPath('dashboard.png') })
   await page.evaluate(() => navigator.serviceWorker.ready)
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
-  await expect(page.getByLabel('Synchronisation', { exact: true })).toHaveText('Synchronisé')
+  await expect(page.getByRole('button', { name: 'Synchronisation : Synchronisé', exact: true })).toBeVisible()
   await context.setOffline(true)
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
-  await expect(page.getByLabel('Synchronisation', { exact: true })).toContainText('Hors connexion')
+  await expect(page.getByRole('button', { name: 'Synchronisation : Hors ligne', exact: true })).toBeVisible()
 
   async function add(description) {
     await navigate(page, 'Ajouter')
@@ -43,7 +45,10 @@ test('offline cold start, edits, persistent queue and server reconciliation', as
   await navigate(page, 'Paramètres')
   await page.getByLabel('Afficher les valeurs de tendance').check()
   await expect(page.getByLabel('Afficher les valeurs de tendance')).toBeEnabled()
-  await expect(page.getByLabel('Synchronisation', { exact: true })).toContainText('en attente')
+  await navigate(page, 'Historique')
+  await page.getByRole('button', { name: 'Synchronisation : Hors ligne', exact: true }).click()
+  await expect(page.getByRole('dialog')).toContainText('Tes modifications sont enregistrées sur cet appareil')
+  await page.getByRole('button', { name: 'Fermer', exact: true }).click()
 
   // Close the app entirely, not merely navigate between its pages.
   await page.close()
@@ -56,6 +61,8 @@ test('offline cold start, edits, persistent queue and server reconciliation', as
   await expect(page.getByText('1 transaction', { exact: true })).toBeVisible()
   await navigate(page, 'Paramètres')
   await expect(page.getByLabel('Afficher les valeurs de tendance')).toBeChecked()
+  await page.getByRole('region', { name: 'À propos' }).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: info.outputPath('settings.png') })
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export Excel', exact: true }).click()
   expect((await download).suggestedFilename()).toBe('mes-comptes.xlsx')
@@ -69,7 +76,7 @@ test('offline cold start, edits, persistent queue and server reconciliation', as
   await page.getByRole('button', { name: 'Déverrouiller' }).click()
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
   await context.setOffline(false)
-  await expect(page.getByLabel('Synchronisation', { exact: true })).toHaveText('Synchronisé', { timeout: 30000 })
+  await expect(page.getByRole('button', { name: 'Synchronisation : Synchronisé', exact: true })).toBeVisible({ timeout: 30000 })
 
   // An independent device has no local cache: data must really be in Firestore.
   const other = await browser.newContext()

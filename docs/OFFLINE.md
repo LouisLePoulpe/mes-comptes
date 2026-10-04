@@ -1,7 +1,7 @@
 # Fonctionnement hors connexion — 2.0.2
 
 Après installation de cette version, ouvrir une fois l’application avec Internet
-et attendre « Synchronisé ». Le coffre, l’historique complet et les paramètres
+et attendre que l’icône de synchronisation devienne verte. Le coffre, l’historique complet et les paramètres
 sont alors disponibles sur cet appareil. Ne pas désinstaller ou effacer les
 données de l’application tant que des changements attendent leur synchronisation.
 
@@ -11,8 +11,9 @@ mises en attente. Les données Firestore restent chiffrées dans le cache persis
 IndexedDB, isolées par chemin utilisateur. Firestore conserve sa file de mutations
 entre les redémarrages et la transmet automatiquement au retour du réseau.
 Les formulaires attendent l’application locale de leur mutation, pas son accusé
-de réception serveur. Le bandeau distingue données locales, modifications en
-attente et synchronisation confirmée. En cas de modifications concurrentes du
+de réception serveur. L’icône près de Dashboard et Historique est verte lorsque
+les données sont synchronisées, orange pendant la synchronisation et rouge hors
+ligne. Un appui affiche les détails. En cas de modifications concurrentes du
 même document sur plusieurs appareils, la dernière écriture appliquée l’emporte.
 
 Une première connexion/configuration, la suppression complète du compte et

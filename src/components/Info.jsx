@@ -2,12 +2,12 @@ import { useRef, useId } from 'react'
 import { createPortal } from 'react-dom'
 import { Info as InfoIcon } from 'lucide-react'
 
-export default function Info({ title, children }) {
+export default function Info({ title, children, icon, buttonLabel, buttonClassName }) {
   const ref = useRef(null)
   const id = useId()
   return <>
-    <button type="button" className="inline-flex items-center justify-center rounded-full text-muted hover:text-foreground" aria-label={`Afficher les explications : ${title}`} onClick={() => ref.current?.showModal()}>
-      <InfoIcon size={16} />
+    <button type="button" className={buttonClassName || "inline-flex items-center justify-center rounded-full text-muted hover:text-foreground"} aria-label={buttonLabel || `Afficher les explications : ${title}`} title={buttonLabel} onClick={() => ref.current?.showModal()}>
+      {icon || <InfoIcon size={16} />}
     </button>
     {createPortal(<dialog aria-labelledby={id} ref={ref} className="info-dialog bg-card text-foreground rounded-2xl p-5 max-w-md shadow-xl">
       <h3 id={id} className="font-semibold mb-3">{title}</h3>

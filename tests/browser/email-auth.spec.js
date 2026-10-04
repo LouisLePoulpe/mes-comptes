@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { setup, login } from './helpers'
+import { setup, login, logout } from './helpers'
 
 test('compte e-mail vérifié, reconnexion et réinitialisation conservent le coffre', async ({ page, request }, info) => {
   const email = `email-${info.project.name}@example.test`
@@ -26,7 +26,7 @@ test('compte e-mail vérifié, reconnexion et réinitialisation conservent le co
   await page.getByRole('button', { name: 'J’ai vérifié mon adresse' }).click()
   await setup(page)
   const uid = await page.evaluate(async () => (await import('/mes-comptes/src/firebase.js')).auth.currentUser.uid)
-  await page.getByRole('button', { name: 'Se déconnecter' }).click()
+  await logout(page)
   await page.getByRole('button', { name: 'Mot de passe oublié', exact: true }).click()
   await page.getByLabel('Adresse e-mail').fill(email)
   await page.getByRole('button', { name: 'Envoyer le lien' }).click()
@@ -54,7 +54,7 @@ test('un compte Google retrouve le même uid après ajout du mot de passe par r�
   await login(page, email)
   await setup(page)
   const uid = await page.evaluate(async () => (await import('/mes-comptes/src/firebase.js')).auth.currentUser.uid)
-  await page.getByRole('button', { name: 'Se déconnecter' }).click()
+  await logout(page)
   await page.getByRole('button', { name: 'Mot de passe oublié', exact: true }).click()
   await page.getByLabel('Adresse e-mail').fill(email)
   await page.getByRole('button', { name: 'Envoyer le lien' }).click()

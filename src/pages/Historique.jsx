@@ -7,6 +7,7 @@ import { deleteDoc, updateDoc } from "../data/offline"
 import { encrypt } from "../crypto"
 import { Trash2, Pencil, X, Filter } from "lucide-react"
 import { matchesDescription } from "../domain/search"
+import SyncStatus from '../components/SyncStatus'
 
 function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
   const { uid, accounts } = useData()
@@ -274,7 +275,7 @@ export default function Historique({ cryptoKey }) {
       {error && <p role="alert" className="text-negative">{error}</p>}
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold">Historique</h2>
+        <div className="flex items-center gap-2"><h2 className="text-2xl font-bold mb-0">Historique</h2><SyncStatus /></div>
       </div>
 
       <div className="mb-4">

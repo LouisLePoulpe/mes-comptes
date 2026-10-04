@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import * as XLSX from 'xlsx'
 import { readFile } from 'node:fs/promises'
 
-import { login, setup, navigate } from './helpers'
+import { login, setup, navigate, logout } from './helpers'
 
 async function addTransaction(page, { amount, date, description }) {
   await navigate(page, 'Ajouter')
@@ -74,7 +74,7 @@ test('coffre, historique complet, comptes, export, récupération et changement 
 
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
-  await page.getByRole('button', { name: 'Se déconnecter' }).click()
+  await logout(page)
   await login(page, email, true)
   await page.getByLabel('Passphrase', { exact: true }).fill('incorrecte')
   await page.getByRole('button', { name: 'Déverrouiller' }).click()
@@ -86,7 +86,7 @@ test('coffre, historique complet, comptes, export, récupération et changement 
   await navigate(page, 'Historique')
   await expect(page.getByText('2 transactions', { exact: true })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Se déconnecter' }).click()
+  await logout(page)
   await login(page, `other-${info.project.name}@example.test`)
   await setup(page)
   await navigate(page, 'Historique')
