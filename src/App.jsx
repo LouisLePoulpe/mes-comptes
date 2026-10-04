@@ -161,10 +161,10 @@ function Application() {
       <main className="app-content flex-1 p-4 pb-20">
         {["accounts", "categories"].includes(page) && <button className="settings-back" onClick={() => setPage("settings")}>← Paramètres</button>}
         {page === "dashboard" && <Dashboard cryptoKey={cryptoKey} />}
-        {page === "historique" && <Historique cryptoKey={cryptoKey} onImport={() => setPage("import")} />}
+        {page === "historique" && <Historique cryptoKey={cryptoKey} />}
         {page === "ajouter" && <Ajouter cryptoKey={cryptoKey} onSuccess={() => setPage("historique")} />}
         {page === "categories" && <Categories cryptoKey={cryptoKey} />}
-        {page === "import" && <Importer cryptoKey={cryptoKey} onClose={() => setPage("historique")} />}
+        {page === "import" && <Importer cryptoKey={cryptoKey} onClose={() => setPage("settings")} />}
         {page === "settings" && <Settings user={user} onAccounts={() => setPage("accounts")} onCategories={() => setPage("categories")} onImport={() => setPage("import")} onDelete={deleteAccount} />}
         {page === "accounts" && <Accounts cryptoKey={cryptoKey} />}
       </main>

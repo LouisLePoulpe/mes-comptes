@@ -15,8 +15,8 @@ function file(rows) {
   return { name:'historique-v1.xlsx', mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer:Buffer.from(XLSX.write(book,{bookType:'xlsx',type:'array'})) }
 }
 async function chooseImport(page, rows) {
-  await navigate(page,'Historique')
-  await page.getByRole('button',{name:'Importer un historique',exact:true}).click()
+  await navigate(page,'Paramètres')
+  await page.getByRole('button',{name:'Importer ou vérifier un export',exact:true}).click()
   await page.getByLabel('Fichier à importer').setInputFiles(file(rows))
 }
 
@@ -38,6 +38,7 @@ test('import V1 confirmé, doublons, recherche, calculs, thème et export intég
   await page.getByRole('button', { name: 'Vérifier la cohérence avec cet export' }).click()
   await expect(page.getByRole('region', { name: 'Comparaison de l’historique' })).toContainText('3 ligne(s) manquante(s)')
   await page.getByRole('button',{name:'Retour',exact:true}).click()
+  await navigate(page,'Historique')
   await expect(page.getByText('Aucune transaction',{exact:true})).toBeVisible()
   await chooseImport(page,records)
   await page.getByRole('button',{name:'Préparer l’aperçu'}).click()
@@ -46,11 +47,13 @@ test('import V1 confirmé, doublons, recherche, calculs, thème et export intég
   await page.getByRole('button', { name: 'Vérifier la cohérence avec cet export' }).click()
   await expect(page.getByRole('region', { name: 'Comparaison de l’historique' })).toContainText('Historique identique à cet export.')
   await page.getByRole('button',{name:'Retour',exact:true}).click()
+  await navigate(page,'Historique')
   await expect(page.getByText('3 transactions',{exact:true})).toBeVisible()
   await page.getByLabel('Rechercher par nom').fill('CAFE marche')
   await expect(page.getByText('2 transactions',{exact:true})).toBeVisible()
   await expect(page.getByText('Premier salaire',{exact:true})).toBeHidden()
   // Export ignores display filters and includes all dates.
+  await navigate(page,'Paramètres')
   const downloaded = page.waitForEvent('download')
   await page.getByRole('button',{name:'Export Excel',exact:true}).click()
   const download = await downloaded
@@ -58,6 +61,7 @@ test('import V1 confirmé, doublons, recherche, calculs, thème et export intég
   const rows = XLSX.utils.sheet_to_json(book.Sheets.Transactions)
   expect(rows).toHaveLength(3)
   expect(rows[0].Date).toBe('15/01/2001')
+  await navigate(page,'Historique')
   await page.getByLabel('Rechercher par nom').fill('salaire')
   await page.getByRole('button',{name:'Modifier Premier salaire'}).click()
   await page.getByLabel('Montant (€)').fill('(100 + 7,50) / 2')
@@ -101,7 +105,7 @@ test('partage mobile : fichier Excel, annulation et solution de téléchargement
   await page.goto('./')
   await login(page,`sharing-${info.project.name}@example.test`)
   await setup(page)
-  await navigate(page,'Historique')
+  await navigate(page,'Paramètres')
   await page.getByRole('button',{name:'Partager l’export'}).click()
   await expect(page.getByRole('status')).toHaveText('Partage terminé.')
   const shared=await page.evaluate(()=>window.testSharedFile)
@@ -145,6 +149,7 @@ test('un import interrompu après 100 lignes reprend sans perte ni doublon', asy
   await page.getByRole('button',{name:'Confirmer l’import'}).click()
   await expect(page.getByRole('status')).toHaveText('Import terminé : 105 ajoutées, 100 déjà présentes.')
   await page.getByRole('button',{name:'Retour',exact:true}).click()
+  await navigate(page,'Historique')
   await expect(page.getByText('205 transactions',{exact:true})).toBeVisible()
 })
 

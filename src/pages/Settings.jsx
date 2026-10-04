@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useData } from '../data/context'
 import { orderedCards } from '../domain/trend'
+import ExportActions from '../components/ExportActions'
 import ThemeToggle from '../components/ThemeToggle'
 import Info from '../components/Info'
 import ColorPalette from '../components/ColorPalette'
@@ -38,8 +39,9 @@ export default function Settings({ user, onImport, onAccounts, onCategories, onD
       <p className="text-sm text-muted break-all">Identifiant : {user.uid}</p>
     </div>
     <div className="bg-card rounded-xl p-4 space-y-3">
-      <h3 className="font-semibold">Reprendre un ancien historique <Info title="Import et vérification"><p>Importe l’export complet de l’ancien compte et conserve cet ancien compte jusqu’à la fin des vérifications. La comparaison porte sur les transactions du fichier ; elle ne prouve pas que le fichier contient tout l’ancien historique.</p></Info></h3>
+      <h3 className="font-semibold">Import et export <Info title="Import et vérification"><p>Importe l’export complet de l’ancien compte et conserve cet ancien compte jusqu’à la fin des vérifications. La comparaison porte sur les transactions du fichier ; elle ne prouve pas que le fichier contient tout l’ancien historique.</p></Info></h3>
       <button className="bg-blue-600 text-white rounded px-4 py-2" onClick={onImport}>Importer ou vérifier un export</button>
+      <ExportActions />
     </div>
     <div className="bg-card rounded-xl p-4 space-y-3 border border-negative">
       <h3 className="font-semibold text-negative">Supprimer le compte</h3>

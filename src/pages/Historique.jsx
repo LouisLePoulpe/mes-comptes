@@ -7,7 +7,6 @@ import { deleteDoc, updateDoc } from "firebase/firestore"
 import { encrypt } from "../crypto"
 import { Trash2, Pencil, X, Filter } from "lucide-react"
 import { matchesDescription } from "../domain/search"
-import ExportActions from "../components/ExportActions"
 
 function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
   const { uid, accounts } = useData()
@@ -137,7 +136,7 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
 
 const MOIS_NOMS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"]
 
-export default function Historique({ cryptoKey, onImport }) {
+export default function Historique({ cryptoKey }) {
   const { uid, transactions, categories, accounts, accountName } = useData()
   const [search, setSearch] = useState("")
   const [filtres, setFiltres] = useState({ banque: "", categorie: "", type: "", mois: "", annee: "" })
@@ -276,10 +275,8 @@ export default function Historique({ cryptoKey, onImport }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold">Historique</h2>
-        <ExportActions />
       </div>
 
-      <button onClick={onImport} className="bg-field rounded-xl px-4 py-2 mb-4">Importer un historique</button>
       <div className="mb-4">
         <label htmlFor="history-search" className="text-sm text-muted block mb-1">Rechercher par nom</label>
         <input id="history-search" type="search" value={search} onChange={event => setSearch(event.target.value)}

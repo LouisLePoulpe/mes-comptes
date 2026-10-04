@@ -56,7 +56,7 @@ test('coffre, historique complet, comptes, export, récupération et changement 
   // Monthly summaries must never truncate the progression chart's full history.
   await expect(page.locator('.recharts-line-curve').first()).toBeVisible()
 
-  await navigate(page, 'Historique')
+  await navigate(page, 'Paramètres')
   const downloaded = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export Excel' }).click()
   const download = await downloaded
@@ -66,6 +66,7 @@ test('coffre, historique complet, comptes, export, récupération et changement 
   expect(rows.map(row => row.Banque)).toEqual(['Compte renommé', 'Compte renommé'])
   expect(rows[0].Date).toBe('15/01/2001')
   expect(rows.reduce((sum, row) => sum + row.Montant, 0)).toBe(1200.75)
+  await navigate(page, 'Historique')
   await page.getByRole('button', { name: 'Modifier Premier versement' }).click()
   await page.getByLabel('Montant (€)').fill('1001.25')
   await page.getByRole('button', { name: 'Sauvegarder' }).click()
