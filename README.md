@@ -1,16 +1,20 @@
-# Poulpécule 2.0.2
+# Poulpécule 2.0.3
 
 - [Ouvrir le site](https://louislepoulpe.github.io/mes-comptes/)
-- [Télécharger l’APK Android signée](https://github.com/LouisLePoulpe/mes-comptes/releases/download/v2.0.2/Poulpecule-2.0.2.apk)
-- [Installation et notes de version](https://github.com/LouisLePoulpe/mes-comptes/releases/tag/v2.0.2)
+- [Télécharger l’APK Android signée](https://github.com/LouisLePoulpe/mes-comptes/releases/download/v2.0.3/Poulpecule-2.0.3.apk)
+- [Installation et notes de version](https://github.com/LouisLePoulpe/mes-comptes/releases/tag/v2.0.3)
 
 Comptes personnels isolés, données chiffrées, historique complet, import/export Excel,
 budget configurable, recherche, calculs de montants et modes clair/sombre/système.
 
 La version 2.0.2 rétablit l’usage hors connexion avec conservation des modifications
 après redémarrage et synchronisation automatique. Après la mise à jour, ouvrir
-l’application avec Internet et attendre « Synchronisé » une première fois.
+l’application avec Internet et attendre l’icône de synchronisation verte une première fois.
 Voir [le fonctionnement hors connexion et ses tests](docs/OFFLINE.md).
+
+La version 2.0.3 retire le bandeau supérieur, regroupe la déconnexion et « À propos »
+dans Paramètres, affiche un indicateur de synchronisation compact dans Dashboard
+et Historique, et centre les boutons de navigation.
 
 L’export Android a été validé sur appareil. La release configure Google natif ;
 son parcours complet reste à confirmer sur appareil. La signature stable permet
