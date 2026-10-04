@@ -1,6 +1,9 @@
 # Requested V2 features
 
-All changes remain on the development branch; none imply production data migration or deployment.
+V2 is merged into main and the website is published. Android export and the
+owner's import were validated. A stable signed APK is available; native Google
+acceptance remains pending. The table below records the original development
+checklist. No automatic production data migration occurred.
 
 | Request | Implementation | Remaining validation |
 |---|---|---|

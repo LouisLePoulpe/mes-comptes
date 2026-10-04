@@ -1,4 +1,16 @@
-# Mes Comptes V2 (branche de développement)
+# Poulpécule 2.0.0
+
+- [Ouvrir le site](https://louislepoulpe.github.io/mes-comptes/)
+- [Télécharger l’APK Android signée](https://github.com/LouisLePoulpe/mes-comptes/releases/download/v2.0.0/Poulpecule-2.0.0.apk)
+- [Installation et notes de version](https://github.com/LouisLePoulpe/mes-comptes/releases/tag/v2.0.0)
+
+Comptes personnels isolés, données chiffrées, historique complet, import/export Excel,
+budget configurable, recherche, calculs de montants et modes clair/sombre/système.
+
+L’export Android a été validé sur appareil. La release configure Google natif ;
+son parcours complet reste à confirmer sur appareil. La signature stable permet
+les futures mises à jour. Pour remplacer une APK de test signée différemment,
+conserver son export et sa passphrase avant de la désinstaller.
 
 Fonctionnalités : [suivi V2](docs/V2-FEATURES.md). Version APK : [préparation Android](docs/ANDROID.md).
 

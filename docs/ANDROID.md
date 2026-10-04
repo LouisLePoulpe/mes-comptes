@@ -1,5 +1,10 @@
 # Mes Comptes Android
 
+Release status (2.0.0): the owner validated Android document export. A stable-key
+release with Google configured was built from commit eda54ea. Full native Google
+sign-in remains to be confirmed on device. The preview instructions below describe
+test variants, not the signed release linked from the README.
+
 An Android project now lives in `android/`, sharing the V2 React screens with the web app. Package ID: `fr.louislepoulpe.mescomptes`. The APK packages assets locally, uses no web service worker, supports Android back navigation, adjusts for keyboard/safe areas and disables OS backup of app storage. Minimum Android API is 24; target/compile API is 36 (Capacitor 8). The device must have an up-to-date Android System WebView.
 
 ## Preview build

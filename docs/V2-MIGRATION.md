@@ -1,6 +1,9 @@
 # Mes Comptes V2 foundations
 
-This branch is a preview, not a production cutover. Main and the published gh-pages app are unchanged. Do not deploy `firestore.v2.rules` over V1: it intentionally denies the root collections used by V1.
+V2 is merged into main and published on gh-pages. The old static site is preserved
+by tag v1-site-backup; original Firestore data has not been deleted. Do not deploy
+`firestore.v2.rules` over V1: it denies the root collections used by V1.
+The owner installed coexistence rules separately.
 
 ## Data model
 
