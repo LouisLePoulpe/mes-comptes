@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { addDoc, updateDoc } from 'firebase/firestore'
+import { addDoc, updateDoc } from '../data/offline'
 import { useData } from '../data/context'
 import { userCollection, userDoc } from '../data/references'
 import { encrypt } from '../crypto'

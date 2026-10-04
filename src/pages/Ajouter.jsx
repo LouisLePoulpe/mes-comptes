@@ -3,7 +3,7 @@ import { calculateAmount } from "../domain/amount"
 import { useState } from "react"
 import { userCollection } from "../data/references"
 import { useData } from "../data/context"
-import { addDoc } from "firebase/firestore"
+import { addDoc } from "../data/offline"
 import { encrypt } from "../crypto"
 
 export default function Ajouter({ cryptoKey, onSuccess }) {

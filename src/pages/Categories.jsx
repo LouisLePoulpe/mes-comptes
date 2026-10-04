@@ -3,7 +3,7 @@ import Info from '../components/Info'
 import { useState } from "react"
 import { userCollection, userDoc } from "../data/references"
 import { useData } from "../data/context"
-import { addDoc, deleteDoc, updateDoc } from "firebase/firestore"
+import { addDoc, deleteDoc, updateDoc } from "../data/offline"
 import { encrypt } from "../crypto"
 import { Plus, Trash2, Pencil, Check, X } from "lucide-react"
 

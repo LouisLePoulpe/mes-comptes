@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator, CACHE_SIZE_UNLIMITED } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
 
 const firebaseConfig = {
@@ -16,7 +16,7 @@ const app = initializeApp(useProduction ? firebaseConfig : { ...firebaseConfig, 
 // Keep the complete encrypted Firestore cache on the device. Firestore queues
 // writes while offline and flushes them automatically when connectivity returns.
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager(), cacheSizeBytes: CACHE_SIZE_UNLIMITED }),
 });
 export const auth = getAuth(app);
 auth.languageCode = "fr";

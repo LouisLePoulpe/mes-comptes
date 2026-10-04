@@ -2,7 +2,6 @@
 const PBKDF2_ITERATIONS = 310000
 const SALT_KEY = "mes-comptes-salt"
 const KEY_KEY = "mes-comptes-key"
-const VAULT_META_KEY = "mes-comptes-vault-meta"
 
 // ── UTILITAIRES ─────────────────────────────────────────────────────────────
 const buf2hex = (buf) => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("")
@@ -108,15 +107,4 @@ export async function loadKeyLocally(uid) {
 export function clearKeyLocally(uid) {
   localStorage.removeItem(`${KEY_KEY}:${uid}`)
   localStorage.removeItem(`${SALT_KEY}:${uid}`)
-}
-
-export function saveVaultMetadataLocally(uid, metadata) {
-  localStorage.setItem(`${VAULT_META_KEY}:${uid}`, JSON.stringify(metadata))
-}
-
-export function loadVaultMetadataLocally(uid) {
-  try {
-    const value = localStorage.getItem(`${VAULT_META_KEY}:${uid}`)
-    return value ? JSON.parse(value) : null
-  } catch { return null }
 }

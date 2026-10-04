@@ -46,6 +46,7 @@ export default function Importer({ cryptoKey, onClose }) {
   }
   async function save() {
     if (guard.current) return
+    if (!navigator.onLine) { setError('Reconnecte-toi pour importer : la vérification des doublons nécessite le serveur. Ton fichier et ton aperçu sont conservés.'); return }
     guard.current = true; setBusy(true); setError(''); setProgress(0); setComparison(null)
     try { setResult(await commitImport(uid, cryptoKey, plan, setProgress)); setPlan(null) }
     catch { setError('Import interrompu. Les lignes déjà ajoutées sont conservées. Tu peux réessayer sans les écraser ni les importer deux fois.') }

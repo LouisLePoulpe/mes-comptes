@@ -3,8 +3,8 @@ import { Capacitor } from "@capacitor/core"
 import { useState, useEffect } from "react"
 import { auth } from "./firebase"
 import { onIdTokenChanged } from "firebase/auth"
-import { getDoc } from "firebase/firestore"
-import { loadKeyLocally, loadVaultMetadataLocally, clearKeyLocally, decrypt } from "./crypto"
+import { getVaultDoc } from "./data/offline"
+import { loadKeyLocally, clearKeyLocally, decrypt } from "./crypto"
 import { userDoc } from "./data/references"
 import { logoutGoogle } from "./nativeAuth"
 import Login, { VerifyEmail } from "./components/Login"
@@ -37,6 +37,12 @@ function Application() {
   const [deleting, setDeleting] = useState(false)
   const [deletionError, setDeletionError] = useState('')
   const [retryPassword, setRetryPassword] = useState('')
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    const retry = () => setAttempt(value => value + 1)
+    if (error) window.addEventListener('online', retry)
+    return () => window.removeEventListener('online', retry)
+  }, [error])
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
     const handle = NativeApp.addListener('backButton', () => {
@@ -59,16 +65,8 @@ function Application() {
       if (u && deletionPending(u.uid)) { setLoading(false); return }
       try {
         if (u && !(u.providerData.some(provider => provider.providerId === "password") && !u.emailVerified)) {
-          let config
-          let verif
-          try {
-            config = await getDoc(userDoc(u.uid, "config", "crypto"))
-            verif = await getDoc(userDoc(u.uid, "config", "verif"))
-          } catch {
-            const local = loadVaultMetadataLocally(u.uid)
-            config = local ? { exists: () => true, data: () => local } : { exists: () => false }
-            verif = local?.encrypted ? { exists: () => true, data: () => ({ encrypted: local.encrypted }) } : { exists: () => false }
-          }
+          const config = await getVaultDoc(userDoc(u.uid, "config", "crypto"))
+          const verif = config.exists() ? await getVaultDoc(userDoc(u.uid, "config", "verif")) : null
           let key = null
           if (config.exists()) {
             try {
@@ -82,13 +80,13 @@ function Application() {
           setCryptoState(!config.exists() ? "setup" : key ? "ready" : "unlock")
         }
       } catch {
-        if (current === generation) setError("Impossible de vérifier ton coffre. Vérifie la connexion et les autorisations.")
+        if (current === generation) setError("Coffre indisponible sur cet appareil. Reconnecte-toi à Internet pour le télécharger, puis réessaie.")
       } finally {
         if (current === generation) setLoading(false)
       }
     })
     return () => { generation++; unsub() }
-  }, [])
+  }, [attempt])
 
   const handleComplete = (key) => {
     if (auth.currentUser?.uid !== user.uid) return
@@ -129,7 +127,7 @@ function Application() {
   if (user.providerData.some(provider => provider.providerId === "password") && !user.emailVerified)
     return <VerifyEmail user={user} onLogout={logout} />
 
-  if (error) return <div role="alert">{error}<button aria-label="Se déconnecter" onClick={logout}>Se déconnecter</button></div>
+  if (error) return <div className="min-h-screen bg-app p-6 flex flex-col justify-center items-center gap-4"><p role="alert">{error}</p><button onClick={() => setAttempt(value => value + 1)}>Réessayer</button><button aria-label="Se déconnecter" onClick={logout}>Se déconnecter</button></div>
 
   if (cryptoState === "checking") return (
     <div className="min-h-screen flex items-center justify-center bg-app text-foreground">
