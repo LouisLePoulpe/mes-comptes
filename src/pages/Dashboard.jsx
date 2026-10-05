@@ -1,6 +1,9 @@
 import { financeSummary } from '../domain/finance'
 import { trend, orderedCards } from '../domain/trend'
-import { accountMovements } from "../domain/movements"
+import {
+  accountBalancesAt,
+  accountTimeline,
+} from "../domain/initialBalances"
 import { useState } from "react"
 import { useData } from "../data/context"
 import Info from "../components/Info"
@@ -37,6 +40,7 @@ export default function Dashboard() {
     transactions,
     accounts,
     categories,
+    initialBalances,
     preferences,
   } = useData()
 
@@ -60,8 +64,8 @@ export default function Dashboard() {
   const moisDisponibles = []
   const vus = new Set()
 
-  transactions.forEach(transaction => {
-    const date = new Date(transaction.date)
+  ;[...transactions, ...initialBalances].forEach(item => {
+    const date = new Date(item.date)
 
     if (Number.isNaN(date.getTime())) return
 
@@ -122,89 +126,71 @@ export default function Dashboard() {
         })
 
   /*
-   * Mouvements par compte
+   * Soldes des comptes.
+   *
+   * Le filtre mensuel affiche
+   * le solde à la fin du mois,
+   * et non uniquement les
+   * mouvements de ce mois.
    */
+  const cutoffTimestamp =
+    moisFiltre === "all"
+      ? Infinity
+      : (() => {
+          const [year, month] =
+            moisFiltre
+              .split("-")
+              .map(Number)
+
+          return (
+            Date.UTC(
+              year,
+              month,
+              1
+            ) - 1
+          )
+        })()
+
   const soldes =
-    Object.fromEntries(
-      accounts.map(account => [
-        account.id,
-        0,
-      ])
+    accountBalancesAt(
+      accounts,
+      transactions,
+      initialBalances,
+      cutoffTimestamp
     )
 
   let totalSorties = 0
 
-  filtrees.forEach(transaction => {
-    for (
-      const [id, amount]
-      of accountMovements(transaction)
-    ) {
-      soldes[id] =
-        (soldes[id] || 0) + amount
+  filtrees.forEach(
+    transaction => {
+      if (
+        transaction.type ===
+        "Sortie"
+      ) {
+        totalSorties +=
+          transaction.montant
+      }
     }
-
-    if (transaction.type === "Sortie") {
-      totalSorties += transaction.montant
-    }
-  })
+  )
 
   /*
-   * Historique des comptes
-   */
-  const graphData = []
-
-  const running =
-    Object.fromEntries(
-      accounts.map(account => [
-        account.id,
-        0,
-      ])
-    )
-
-  transactions.forEach(transaction => {
-    for (
-      const [id, amount]
-      of accountMovements(transaction)
-    ) {
-      running[id] =
-        (running[id] || 0) + amount
-    }
-
-    const date =
-      new Date(
-        transaction.date
-      ).toLocaleDateString("fr-FR")
-
-    graphData.push({
-      date,
-      timestamp:
-        Date.parse(transaction.date),
-
-      ...Object.fromEntries(
-        Object.entries(running).map(
-          ([id, value]) => [
-            id,
-            value,
-          ]
-        )
-      ),
-    })
-  })
-
-  /*
-   * Un point par fin de journée.
+   * Historique des comptes :
+   * montants initiaux +
+   * transactions.
    */
   let graphDataWithTrend =
-    [...new Map(
-      graphData.map(row => [
-        row.date,
-        row,
-      ])
-    ).values()]
+    accountTimeline(
+      accounts,
+      transactions,
+      initialBalances
+    )
 
   const trends = {}
 
-  for (const account of accounts) {
+  for (
+    const account
+    of accounts
+  ) {
     const result =
       trend(
         graphDataWithTrend,

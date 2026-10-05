@@ -9,7 +9,7 @@ test('every V2 collection is owner-only, including keys, list queries and writes
     const alice = env.authenticatedContext('alice').firestore()
     const bob = env.authenticatedContext('bob').firestore()
     const anonymous = env.unauthenticatedContext().firestore()
-    for (const group of ['transactions', 'categories', 'accounts', 'config']) {
+    for (const group of ['transactions', 'categories', 'accounts', 'initialBalances', 'config']) {
       const path = `users/alice/${group}/one`
       await assertSucceeds(setDoc(doc(alice, path), { encrypted: 'fixture' }))
       await assertSucceeds(getDoc(doc(alice, path)))
@@ -37,7 +37,7 @@ test('password accounts need a verified address for server access', async () => 
   try {
     const pending = env.authenticatedContext('email-owner', { email_verified: false, firebase: { sign_in_provider: 'password' } }).firestore()
     const verified = env.authenticatedContext('email-owner', { email_verified: true, firebase: { sign_in_provider: 'password' } }).firestore()
-    for (const group of ['transactions', 'categories', 'accounts', 'config']) {
+    for (const group of ['transactions', 'categories', 'accounts', 'initialBalances', 'config']) {
       const path = `users/email-owner/${group}/one`
       await assertFails(setDoc(doc(pending, path), { encrypted: 'fixture' }))
       await assertSucceeds(setDoc(doc(verified, path), { encrypted: 'fixture' }))

@@ -8,7 +8,7 @@ import { FirebaseAuthentication } from '@capacitor-firebase/authentication'
 import { GoogleAuthProvider } from 'firebase/auth'
 
 const LEGACY_UIDS = new Set(['3tVQFbLCRdYaU7KWFCETsC9dojD3', 'y9U4soXK8neWBJaq4MuNjZFsEAi2'])
-const COLLECTIONS = ['transactions', 'categories', 'accounts', 'config']
+const COLLECTIONS = ['transactions', 'categories', 'accounts', 'initialBalances', 'config']
 export const deletionPending = uid => localStorage.getItem('poulpecule-deleting:' + uid) === 'true'
 
 export async function deleteCurrentAccount({ password, confirm }) {
