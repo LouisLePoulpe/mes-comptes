@@ -16,6 +16,7 @@ import Dashboard from "./pages/Dashboard"
 import Historique from "./pages/Historique"
 import Ajouter from "./pages/Ajouter"
 import Categories from "./pages/Categories"
+import Recurring from "./pages/Recurring"
 import Setup from "./pages/Setup"
 import Unlock from "./pages/Unlock"
 import { LayoutDashboard, History, PlusCircle, Settings as SettingsIcon } from "lucide-react"
@@ -154,13 +155,14 @@ function Application() {
     <div className="min-h-screen bg-app text-foreground flex flex-col">
       <DataProvider key={user.uid} uid={user.uid} cryptoKey={cryptoKey}>
       <main className="app-content flex-1 p-4 pb-20">
-        {["accounts", "categories"].includes(page) && <button className="settings-back" onClick={() => setPage("settings")}>← Paramètres</button>}
+        {["accounts", "categories", "recurring"].includes(page) && <button className="settings-back" onClick={() => setPage("settings")}>← Paramètres</button>}
         {page === "dashboard" && <Dashboard cryptoKey={cryptoKey} />}
         {page === "historique" && <Historique cryptoKey={cryptoKey} />}
         {page === "ajouter" && <Ajouter cryptoKey={cryptoKey} onSuccess={() => setPage("historique")} />}
         {page === "categories" && <Categories cryptoKey={cryptoKey} />}
+        {page === "recurring" && <Recurring cryptoKey={cryptoKey} />}
         {page === "import" && <Importer cryptoKey={cryptoKey} onClose={() => setPage("settings")} />}
-        {page === "settings" && <Settings user={user} onLogout={logout} onAccounts={() => setPage("accounts")} onCategories={() => setPage("categories")} onImport={() => setPage("import")} onDelete={deleteAccount} />}
+        {page === "settings" && <Settings user={user} onLogout={logout} onAccounts={() => setPage("accounts")} onCategories={() => setPage("categories")} onRecurring={() => setPage("recurring")} onImport={() => setPage("import")} onDelete={deleteAccount} />}
         {page === "accounts" && <Accounts cryptoKey={cryptoKey} />}
       </main>
       </DataProvider>
@@ -171,7 +173,7 @@ function Application() {
             key={id}
             onClick={() => setPage(id)}
             className={`flex flex-col items-center justify-center gap-1 px-1 sm:px-3 py-1 rounded-lg transition text-xs ${
-              (page === id || (id === "settings" && ["accounts", "categories"].includes(page))) ? "text-positive" : "text-muted hover:text-muted"
+              (page === id || (id === "settings" && ["accounts", "categories", "recurring"].includes(page))) ? "text-positive" : "text-muted hover:text-muted"
             }`}
           >
             <Icon size={22} aria-hidden="true" />

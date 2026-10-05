@@ -224,3 +224,85 @@ test('recurring planner creates real income expense and transfer transactions wi
     'saving'
   )
 })
+
+
+test('paused rules generate nothing and an end date stops future occurrences', () => {
+  assert.deepEqual(
+    occurrenceDates(
+      {
+        active: false,
+        startDate:
+          '2027-01-01',
+        unit:
+          RECURRENCE_UNITS.DAY,
+        interval: 1,
+      },
+      '2027-01-10'
+    ),
+    []
+  )
+
+  assert.deepEqual(
+    occurrenceDates(
+      {
+        active: true,
+        startDate:
+          '2027-01-01',
+        endDate:
+          '2027-01-03',
+        unit:
+          RECURRENCE_UNITS.DAY,
+        interval: 1,
+      },
+      '2027-01-10'
+    ),
+    [
+      '2027-01-01',
+      '2027-01-02',
+      '2027-01-03',
+    ]
+  )
+})
+
+
+test('effective date prevents edited or resumed rules from backfilling skipped history', () => {
+  assert.deepEqual(
+    occurrenceDates(
+      {
+        active: true,
+        startDate:
+          '2027-01-01',
+        effectiveFrom:
+          '2027-04-10',
+        unit:
+          RECURRENCE_UNITS.MONTH,
+        interval: 1,
+      },
+      '2027-06-30'
+    ),
+    [
+      '2027-05-01',
+      '2027-06-01',
+    ]
+  )
+
+  assert.deepEqual(
+    occurrenceDates(
+      {
+        active: true,
+        startDate:
+          '2027-01-01',
+        effectiveFrom:
+          '2027-01-04',
+        unit:
+          RECURRENCE_UNITS.DAY,
+        interval: 1,
+      },
+      '2027-01-05'
+    ),
+    [
+      '2027-01-04',
+      '2027-01-05',
+    ]
+  )
+})

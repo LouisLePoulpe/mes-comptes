@@ -4,8 +4,19 @@ import { setDoc } from './offline'
 import { decrypt, encrypt } from '../crypto'
 import { userCollection, userDoc } from './references'
 import { DataContext } from './context'
+import { planRecurringOccurrences } from '../domain/recurring'
 
 const COLLECTIONS = ['transactions', 'categories', 'accounts', 'initialBalances', 'recurringRules', 'preferences']
+const EMPTY_ROWS = Object.freeze([])
+
+function localDay() {
+  const now = new Date()
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-')
+}
 
 // Mounted once per authenticated/unlocked session, above page navigation.
 export default function DataProvider({ uid, cryptoKey, children }) {
@@ -13,6 +24,7 @@ export default function DataProvider({ uid, cryptoKey, children }) {
   const [attempt, setAttempt] = useState(0)
   const [online, setOnline] = useState(navigator.onLine)
   const [syncError, setSyncError] = useState(false)
+  const [recurringError, setRecurringError] = useState('')
   useEffect(() => {
     const update = () => setOnline(navigator.onLine)
     const failed = () => setSyncError(true)
@@ -54,6 +66,129 @@ export default function DataProvider({ uid, cryptoKey, children }) {
     })
     return () => { active = false; stops.forEach(stop => stop()) }
   }, [uid, cryptoKey, attempt])
+  const transactionRows =
+    data.transactions?.rows ||
+    EMPTY_ROWS
+
+  const recurringRows =
+    data.recurringRules?.rows ||
+    EMPTY_ROWS
+
+  const categoryRows =
+    data.categories?.rows ||
+    EMPTY_ROWS
+
+  const accountRows =
+    data.accounts?.rows ||
+    EMPTY_ROWS
+
+  const dataReady =
+    COLLECTIONS.every(
+      name =>
+        Boolean(
+          data[name]?.rows
+        )
+    )
+
+  useEffect(() => {
+    if (!dataReady) return
+
+    let cancelled = false
+
+    /*
+     * On décale la génération après
+     * l'effet courant pour éviter une
+     * mise à jour React synchrone depuis
+     * le corps du useEffect.
+     */
+    Promise.resolve().then(
+      async () => {
+        if (cancelled) return
+
+        let planned
+
+        try {
+          planned =
+            planRecurringOccurrences({
+              rules:
+                recurringRows,
+
+              transactions:
+                transactionRows,
+
+              categories:
+                categoryRows,
+
+              accounts:
+                accountRows,
+
+              throughDate:
+                localDay(),
+            })
+        } catch {
+          if (!cancelled) {
+            setRecurringError(
+              'Une périodicité est invalide. Vérifie-la dans Paramètres → Périodiques.'
+            )
+          }
+
+          return
+        }
+
+        if (!planned.length) {
+          if (!cancelled) {
+            setRecurringError('')
+          }
+
+          return
+        }
+
+        try {
+          for (
+            const occurrence
+            of planned
+          ) {
+            if (cancelled) return
+
+            await setDoc(
+              userDoc(
+                uid,
+                'transactions',
+                occurrence.id
+              ),
+              await encrypt(
+                occurrence.data,
+                cryptoKey
+              )
+            )
+          }
+
+          if (!cancelled) {
+            setRecurringError('')
+          }
+        } catch {
+          if (!cancelled) {
+            setRecurringError(
+              'Certaines transactions périodiques n’ont pas pu être générées. Elles seront réessayées à la prochaine ouverture.'
+            )
+          }
+        }
+      }
+    )
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    uid,
+    cryptoKey,
+    dataReady,
+    recurringRows,
+    transactionRows,
+    categoryRows,
+    accountRows,
+  ])
+
   const error = COLLECTIONS.map(name => data[name]?.error).find(Boolean)
   if (error) return <div className="p-4">
     <p role="alert">{error}</p>
@@ -72,6 +207,7 @@ export default function DataProvider({ uid, cryptoKey, children }) {
   const syncState = !online ? 'offline' : pending || cached ? 'syncing' : 'synced'
   return <DataContext.Provider value={{ ...rows, preferences, savePreferences, uid, accountName, syncState, pending }}>
     {syncError && <p role="alert">Le serveur a refusé une modification. Vérifie ton historique et exporte tes données avant de te déconnecter.</p>}
+    {recurringError && <p role="alert">{recurringError}</p>}
     {children}
   </DataContext.Provider>
 }

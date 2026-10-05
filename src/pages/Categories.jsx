@@ -12,7 +12,7 @@ import { encrypt } from "../crypto"
 import { Plus, Trash2, Pencil, Check, X } from "lucide-react"
 
 export default function Categories({ cryptoKey }) {
-  const { uid, transactions, categories } = useData()
+  const { uid, transactions, categories, recurringRules } = useData()
 
   const [nouvelle, setNouvelle] = useState("")
   const [nouveauRole, setNouveauRole] = useState("")
@@ -63,6 +63,19 @@ export default function Categories({ cryptoKey }) {
     if (utilisées.length > 0) {
       setError(
         `Impossible de supprimer « ${cat.nom} » : ${utilisées.length} transaction(s) l'utilisent.`
+      )
+      return
+    }
+
+    const periodicUses =
+      recurringRules.filter(
+        rule =>
+          rule.categoryId === cat.id
+      )
+
+    if (periodicUses.length > 0) {
+      setError(
+        `Impossible de supprimer « ${cat.nom} » : ${periodicUses.length} périodicité(s) l'utilisent.`
       )
       return
     }

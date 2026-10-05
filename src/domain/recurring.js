@@ -228,6 +228,13 @@ export function occurrenceDates(
       throughDate
     )
 
+  const effectiveFrom =
+    rule.effectiveFrom
+      ? normalizeDay(
+          rule.effectiveFrom
+        )
+      : start
+
   const end =
     rule.endDate
       ? normalizeDay(
@@ -240,7 +247,10 @@ export function occurrenceDates(
       ? end
       : through
 
-  if (last < start) {
+  if (
+    last < start ||
+    last < effectiveFrom
+  ) {
     return []
   }
 
@@ -330,7 +340,11 @@ export function occurrenceDates(
       return result
     }
 
-    result.push(day)
+    if (
+      day >= effectiveFrom
+    ) {
+      result.push(day)
+    }
   }
 
   throw new Error(

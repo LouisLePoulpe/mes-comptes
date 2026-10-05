@@ -9,7 +9,7 @@ import { FINANCE_GROUPS } from '../domain/finance'
 import Brand from '../components/Brand'
 import { LogOut } from 'lucide-react'
 import { version } from '../../package.json'
-export default function Settings({ user, onImport, onAccounts, onCategories, onDelete, onLogout }) {
+export default function Settings({ user, onImport, onAccounts, onCategories, onRecurring, onDelete, onLogout }) {
   const { accounts, preferences, savePreferences } = useData()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -22,7 +22,7 @@ export default function Settings({ user, onImport, onAccounts, onCategories, onD
   function move(index, delta) { const next = [...cards]; [next[index], next[index+delta]] = [next[index+delta],next[index]]; save({cardOrder: next}) }
   return <section className="max-w-2xl mx-auto space-y-5">
     <h2 className="text-2xl font-bold">Paramètres</h2>
-    <div className="settings-grid"><button className="settings-tile" onClick={onAccounts}><strong>Comptes</strong><span>Mes banques et leurs couleurs →</span></button><button className="settings-tile" onClick={onCategories}><strong>Catégories</strong><span>Organiser mes opérations →</span></button></div>
+    <div className="settings-grid"><button className="settings-tile" onClick={onAccounts}><strong>Comptes</strong><span>Mes banques et leurs couleurs →</span></button><button className="settings-tile" onClick={onCategories}><strong>Catégories</strong><span>Organiser mes opérations →</span></button><button className="settings-tile" onClick={onRecurring}><strong>Périodiques</strong><span>Automatiser mes opérations →</span></button></div>
     <div className="bg-card rounded-xl p-4 flex flex-wrap gap-3 items-center justify-between"><h3 className="font-semibold">Apparence</h3><ThemeToggle /></div>
     <div className="bg-card rounded-xl p-4 space-y-3">
       <h3 className="font-semibold flex items-center gap-2">Disposition du Dashboard <Info title="Disposition"><p>Les cartes apparaissent dans cet ordre, de gauche à droite puis de haut en bas.</p></Info></h3>
