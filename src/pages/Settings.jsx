@@ -5,7 +5,7 @@ import ExportActions from '../components/ExportActions'
 import ThemeToggle from '../components/ThemeToggle'
 import Info from '../components/Info'
 import ColorPalette from '../components/ColorPalette'
-import { BUDGET_GROUPS } from '../domain/budget'
+import { FINANCE_GROUPS } from '../domain/finance'
 import Brand from '../components/Brand'
 import { LogOut } from 'lucide-react'
 import { version } from '../../package.json'
@@ -32,7 +32,7 @@ export default function Settings({ user, onImport, onAccounts, onCategories, onD
     </div>
     <div className="bg-card rounded-xl p-4 space-y-3">
       <h3 className="font-semibold flex items-center gap-2">Couleurs du camembert <Info title="Couleurs du camembert"><p>Ces couleurs servent aux trois parts du budget. La couleur du texte indique si l'objectif est respecté.</p></Info></h3>
-      <div className="space-y-4">{BUDGET_GROUPS.map(group => <ColorPalette key={group.id} label={group.name}
+      <div className="space-y-4">{FINANCE_GROUPS.map(group => <ColorPalette key={group.id} label={group.name}
         value={view.budgetColors?.[group.id] || group.color} disabled={busy}
         onChange={color => save({ budgetColors: { ...(view.budgetColors || {}), [group.id]: color } })} />)}</div>
     </div>

@@ -172,3 +172,96 @@ test('custom categories inherit calculations from their role without bank semant
   assert.equal(result.charges, 60)
   assert.equal(result.details.savings[0].name, 'ETF Monde 🌍')
 })
+
+
+test('V2.1 budget groups use strict 50/20/30 thresholds', () => {
+  const categories = [
+    {
+      id: 'salary',
+      nom: 'Salaire',
+      roleId: ROLE_IDS.SALARY,
+    },
+    {
+      id: 'saving',
+      nom: 'Livret',
+      roleId: ROLE_IDS.SAVINGS,
+    },
+    {
+      id: 'charges',
+      nom: 'Charges',
+      roleId: ROLE_IDS.CHARGES,
+    },
+    {
+      id: 'fun',
+      nom: 'Plaisir',
+      roleId: ROLE_IDS.FUN,
+    },
+  ]
+
+  const limit = financeSummary(
+    [
+      {
+        type: FLOWS.INCOME,
+        montant: 1000,
+        categoryId: 'salary',
+      },
+      {
+        type: FLOWS.EXPENSE,
+        montant: 500,
+        categoryId: 'charges',
+      },
+      {
+        type: FLOWS.TRANSFER,
+        montant: 200,
+        categoryId: 'saving',
+      },
+      {
+        type: FLOWS.EXPENSE,
+        montant: 300,
+        categoryId: 'fun',
+      },
+    ],
+    categories
+  )
+
+  assert.deepEqual(
+    limit.groups.map(group => group.percent),
+    [50, 20, 30]
+  )
+
+  assert.deepEqual(
+    limit.groups.map(group => group.ok),
+    [false, false, false]
+  )
+
+  const inside = financeSummary(
+    [
+      {
+        type: FLOWS.INCOME,
+        montant: 1000,
+        categoryId: 'salary',
+      },
+      {
+        type: FLOWS.EXPENSE,
+        montant: 499.99,
+        categoryId: 'charges',
+      },
+      {
+        type: FLOWS.TRANSFER,
+        montant: 200.01,
+        categoryId: 'saving',
+      },
+      {
+        type: FLOWS.EXPENSE,
+        montant: 299.99,
+        categoryId: 'fun',
+      },
+    ],
+    categories
+  )
+
+  assert.deepEqual(
+    inside.groups.map(group => group.ok),
+    [true, true, true]
+  )
+})

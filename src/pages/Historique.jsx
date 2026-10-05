@@ -1,5 +1,10 @@
 import AmountInput from "../components/AmountInput"
 import { calculateAmount } from "../domain/amount"
+import {
+  FLOWS,
+  assertCategoryFlow,
+  isRoleAllowedForFlow,
+} from "../domain/categoryRoles"
 import { useState } from "react"
 import { userDoc } from "../data/references"
 import { useData } from "../data/context"
@@ -13,121 +18,313 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
   const { uid, accounts } = useData()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+
   const [form, setForm] = useState({
     type: transaction.type,
     montant: transaction.montant,
     banque: transaction.banque,
     banqueDest: transaction.banqueDest || "",
-    categorie: transaction.categorie,
-    description: transaction.description,
-    date: transaction.date?.split("T")[0] ?? transaction.date
+    categoryId: transaction.categoryId || "",
+    description: transaction.description || "",
+    date: transaction.date?.split("T")[0] ?? transaction.date,
   })
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const set = (key, value) =>
+    setForm(previous => ({
+      ...previous,
+      [key]: value,
+    }))
+
+  const setType = type => {
+    setForm(previous => ({
+      ...previous,
+      type,
+      categoryId: "",
+      banqueDest:
+        type === FLOWS.TRANSFER
+          ? previous.banqueDest
+          : "",
+    }))
+  }
+
+  const categoriesCompatibles = categories.filter(category =>
+    isRoleAllowedForFlow(category.roleId, form.type)
+  )
 
   const sauvegarder = async () => {
     if (saving) return
+
     setError("")
+
     let montant
-    try { montant = calculateAmount(form.montant) } catch (error) { return setError(error.message) }
-    if (!accounts.some(a => a.id === form.banque) || !Number.isFinite(Date.parse(form.date))) return setError("Compte, montant et date valides requis")
-    if (form.type === 'Transfert' && (!accounts.some(a => a.id === form.banqueDest) || form.banqueDest === form.banque)) return setError('Choisis un compte de destination différent.')
+
+    try {
+      montant = calculateAmount(form.montant)
+    } catch (cause) {
+      return setError(cause.message)
+    }
+
+    if (
+      !accounts.some(account => account.id === form.banque) ||
+      !Number.isFinite(Date.parse(form.date))
+    ) {
+      return setError("Compte, montant et date valides requis.")
+    }
+
+    const category = categories.find(
+      current => current.id === form.categoryId
+    )
+
+    if (!category) {
+      return setError(
+        "Choisis une catégorie compatible avec ce flux."
+      )
+    }
+
+    try {
+      assertCategoryFlow(category, form.type)
+    } catch (cause) {
+      return setError(cause.message)
+    }
+
+    if (
+      form.type === FLOWS.TRANSFER &&
+      (
+        !accounts.some(account => account.id === form.banqueDest) ||
+        form.banqueDest === form.banque
+      )
+    ) {
+      return setError(
+        "Choisis un compte de destination différent."
+      )
+    }
+
     setSaving(true)
+
     try {
       const data = {
-        ...form,
+        type: form.type,
         montant,
-        date: new Date(form.date).toISOString()
+        banque: form.banque,
+        ...(form.type === FLOWS.TRANSFER
+          ? { banqueDest: form.banqueDest }
+          : {}),
+        categoryId: category.id,
+        categorie: category.nom,
+        description: form.description,
+        date: new Date(form.date).toISOString(),
       }
-      const encrypted = await encrypt(data, cryptoKey)
-      await updateDoc(userDoc(uid, "transactions", transaction.id), encrypted)
+
+      await updateDoc(
+        userDoc(uid, "transactions", transaction.id),
+        await encrypt(data, cryptoKey)
+      )
+
       onSave()
-    } catch { setError("Modification impossible. Tes champs sont conservés, tu peux réessayer.") }
-    finally { setSaving(false) }
+    } catch {
+      setError(
+        "Modification impossible. Tes champs sont conservés, tu peux réessayer."
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const btnType = (t) => (
+  const btnType = type => (
     <button
-      onClick={() => set("type", t)}
+      key={type}
+      onClick={() => setType(type)}
       className={`flex-1 py-2 rounded-xl font-semibold transition ${
-        form.type === t
-          ? t === "Entrée" ? "bg-emerald-500 text-white" : "bg-red-500 text-white"
+        form.type === type
+          ? type === FLOWS.INCOME
+            ? "bg-emerald-500 text-white"
+            : type === FLOWS.EXPENSE
+              ? "bg-red-500 text-white"
+              : "bg-blue-500 text-white"
           : "bg-field text-muted hover:bg-hover"
       }`}
-    >{t}</button>
+    >
+      {type}
+    </button>
   )
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div role="dialog" aria-modal="true" aria-label="Modifier la transaction" className="bg-panel rounded-2xl w-full max-w-md flex flex-col gap-4 p-6 max-h-[90vh] overflow-y-auto">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Modifier la transaction"
+        className="bg-panel rounded-2xl w-full max-w-md flex flex-col gap-4 p-6 max-h-[90vh] overflow-y-auto"
+      >
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold">Modifier la transaction</h3>
-          <button aria-label="Fermer la modification" onClick={onClose} className="text-muted hover:text-foreground transition">
+          <h3 className="text-xl font-bold">
+            Modifier la transaction
+          </h3>
+
+          <button
+            aria-label="Fermer la modification"
+            onClick={onClose}
+            className="text-muted hover:text-foreground"
+          >
             <X size={22} />
           </button>
         </div>
 
-        <div className="flex gap-2">{btnType("Entrée")}{btnType("Sortie")}{btnType("Transfert")}</div>
+        <div className="flex gap-2">
+          {btnType(FLOWS.INCOME)}
+          {btnType(FLOWS.EXPENSE)}
+          {btnType(FLOWS.TRANSFER)}
+        </div>
 
-      {form.type === 'Transfert' && <label>Compte de destination<select className="w-full bg-field border border-line rounded-xl p-3" value={form.banqueDest} onChange={e => set("banqueDest", e.target.value)}><option value="">Choisir un compte</option>{accounts.filter(a => a.id !== form.banque).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>}
-      <AmountInput id="Historique-montant" value={form.montant} onChange={value => set("montant", value)} />
+        <AmountInput
+          id="Historique-montant"
+          value={form.montant}
+          onChange={value => set("montant", value)}
+        />
 
         <div>
-          <label className="text-sm text-muted mb-1 block">Banque</label>
-          <div className="flex gap-2">
-            {accounts.map(({ id: b, name }) => (
+          <label className="text-sm text-muted mb-1 block">
+            {form.type === FLOWS.TRANSFER
+              ? "Compte source"
+              : "Compte"}
+          </label>
+
+          <div className="flex flex-wrap gap-2">
+            {accounts.map(account => (
               <button
-                key={b}
-                onClick={() => set("banque", b)}
-                className={`flex-1 py-2 rounded-xl font-semibold transition ${
-                  form.banque === b ? "bg-blue-500 text-white" : "bg-card text-muted hover:bg-field"
+                key={account.id}
+                onClick={() => set("banque", account.id)}
+                className={`flex-1 min-w-24 py-2 rounded-xl font-semibold ${
+                  form.banque === account.id
+                    ? "bg-blue-500 text-white"
+                    : "bg-card text-muted"
                 }`}
-              >{name}</button>
+              >
+                {account.name}
+              </button>
             ))}
           </div>
         </div>
 
+        {form.type === FLOWS.TRANSFER && (
+          <div>
+            <label
+              htmlFor="Historique-destination"
+              className="text-sm text-muted mb-1 block"
+            >
+              Compte de destination
+            </label>
+
+            <select
+              id="Historique-destination"
+              value={form.banqueDest}
+              onChange={event =>
+                set("banqueDest", event.target.value)
+              }
+              className="w-full bg-field border border-line rounded-xl p-3"
+            >
+              <option value="">Choisir...</option>
+
+              {accounts
+                .filter(account => account.id !== form.banque)
+                .map(account => (
+                  <option
+                    key={account.id}
+                    value={account.id}
+                  >
+                    {account.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
+
         <div>
-          <label htmlFor="Historique-categorie" className="text-sm text-muted mb-1 block">Catégorie</label>
+          <label
+            htmlFor="Historique-categorie"
+            className="text-sm text-muted mb-1 block"
+          >
+            Catégorie
+          </label>
+
           <select
             id="Historique-categorie"
-            value={form.categorie}
-            onChange={e => set("categorie", e.target.value)}
-            className="w-full bg-card border border-line rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-emerald-500"
+            value={form.categoryId}
+            onChange={event =>
+              set("categoryId", event.target.value)
+            }
+            className="w-full bg-card border border-line rounded-xl px-4 py-3 text-foreground"
           >
             <option value="">Sélectionner...</option>
-            {categories.map(c => <option key={c.id} value={c.nom}>{c.nom}</option>)}
+
+            {categoriesCompatibles.map(category => (
+              <option
+                key={category.id}
+                value={category.id}
+              >
+                {category.nom}
+              </option>
+            ))}
           </select>
         </div>
 
         <div>
-          <label htmlFor="Historique-description" className="text-sm text-muted mb-1 block">Description</label>
+          <label
+            htmlFor="Historique-description"
+            className="text-sm text-muted mb-1 block"
+          >
+            Description
+          </label>
+
           <input
             id="Historique-description"
             value={form.description}
-            onChange={e => set("description", e.target.value)}
-            className="w-full bg-card border border-line rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-emerald-500"
+            onChange={event =>
+              set("description", event.target.value)
+            }
+            className="w-full bg-card border border-line rounded-xl px-4 py-3 text-foreground"
           />
         </div>
 
         <div>
-          <label htmlFor="Historique-date" className="text-sm text-muted mb-1 block">Date</label>
+          <label
+            htmlFor="Historique-date"
+            className="text-sm text-muted mb-1 block"
+          >
+            Date
+          </label>
+
           <input
             type="date"
             id="Historique-date"
             value={form.date}
-            onChange={e => set("date", e.target.value)}
-            className="w-full bg-card border border-line rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-emerald-500"
+            onChange={event =>
+              set("date", event.target.value)
+            }
+            className="w-full bg-card border border-line rounded-xl px-4 py-3 text-foreground"
           />
         </div>
 
-        {error && <p role="alert" className="text-negative">{error}</p>}
+        {error && (
+          <p role="alert" className="text-negative">
+            {error}
+          </p>
+        )}
+
         <div className="flex gap-3 mt-2">
-          <button onClick={onClose} className="flex-1 bg-field hover:bg-hover text-foreground font-semibold py-3 rounded-xl transition">
+          <button
+            onClick={onClose}
+            className="flex-1 bg-field text-foreground font-semibold py-3 rounded-xl"
+          >
             Annuler
           </button>
-          <button disabled={saving} onClick={sauvegarder} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl transition">
-            ✓ Sauvegarder
+
+          <button
+            disabled={saving}
+            onClick={sauvegarder}
+            className="flex-1 bg-emerald-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl"
+          >
+            {saving ? "Enregistrement..." : "✓ Sauvegarder"}
           </button>
         </div>
       </div>
