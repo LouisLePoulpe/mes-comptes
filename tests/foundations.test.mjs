@@ -7,6 +7,7 @@ import { planMigration, copyMigration } from '../scripts/migration-plan.mjs'
 test('paths require explicit uid and prevent collection/path injection', () => {
   assert.deepEqual(userPath('alice', 'transactions', 'one'), ['users', 'alice', 'transactions', 'one'])
   assert.deepEqual(userPath('alice', 'initialBalances', 'one'), ['users', 'alice', 'initialBalances', 'one'])
+  assert.deepEqual(userPath('alice', 'recurringRules', 'one'), ['users', 'alice', 'recurringRules', 'one'])
   for (const uid of ['', null, 'alice/bob']) assert.throws(() => userPath(uid, 'transactions'))
   assert.throws(() => userPath('alice', 'private'))
   assert.throws(() => userPath('alice', 'config', '../crypto'))

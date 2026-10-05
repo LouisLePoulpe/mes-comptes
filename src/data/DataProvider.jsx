@@ -5,7 +5,7 @@ import { decrypt, encrypt } from '../crypto'
 import { userCollection, userDoc } from './references'
 import { DataContext } from './context'
 
-const COLLECTIONS = ['transactions', 'categories', 'accounts', 'initialBalances', 'preferences']
+const COLLECTIONS = ['transactions', 'categories', 'accounts', 'initialBalances', 'recurringRules', 'preferences']
 
 // Mounted once per authenticated/unlocked session, above page navigation.
 export default function DataProvider({ uid, cryptoKey, children }) {
@@ -38,6 +38,7 @@ export default function DataProvider({ uid, cryptoKey, children }) {
           if (name === 'accounts' || name === 'categories') rows.sort((a,b) => (a.name || a.nom).localeCompare(b.name || b.nom, 'fr', { numeric: true, sensitivity: 'base' }))
           if (name === 'transactions') rows.sort((a, b) => new Date(a.date) - new Date(b.date))
           if (name === 'initialBalances') rows.sort((a, b) => new Date(a.date) - new Date(b.date) || (a.label || '').localeCompare(b.label || '', 'fr'))
+          if (name === 'recurringRules') rows.sort((a, b) => new Date(a.startDate) - new Date(b.startDate) || (a.description || '').localeCompare(b.description || '', 'fr'))
           if (active && current === revision) setData(previous => ({ ...previous, [name]: { rows, pending: snapshot.metadata.hasPendingWrites, cached: snapshot.metadata.fromCache } }))
         } catch {
           if (active && current === revision) setData(previous => ({ ...previous, [name]: {

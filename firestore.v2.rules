@@ -5,7 +5,7 @@ service cloud.firestore {
       && (request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'password'
         || request.auth.token.get('email_verified', false) == true); }
     match /users/{uid}/{group}/{id} {
-      allow read, write: if owner(uid) && group in ['transactions', 'categories', 'accounts', 'initialBalances', 'config'];
+      allow read, write: if owner(uid) && group in ['transactions', 'categories', 'accounts', 'initialBalances', 'recurringRules', 'config'];
     }
     // V2 staging rules. Intentionally denies V1 root collections.
     // Do not deploy over production V1 rules before the coordinated cutover.
