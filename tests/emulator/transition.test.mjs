@@ -24,7 +24,7 @@ test('transition rules preserve both V1 owners and isolate new V2 users in both 
         await assertFails(deleteDoc(doc(other, path)))
       }
     }
-    for (const group of ['transactions', 'categories', 'accounts', 'config']) {
+    for (const group of ['transactions', 'categories', 'accounts', 'initialBalances', 'recurringRules', 'config']) {
       const path = `users/new-email/${group}/one`
       await assertSucceeds(setDoc(doc(fresh, path), { encrypted: 'new vault' }))
       for (const other of [legacyA, legacyB, pending, anonymous]) {

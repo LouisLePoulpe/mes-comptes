@@ -23,7 +23,7 @@ service cloud.firestore {
           || request.auth.token.get('email_verified', false) == true);
     }
     match /users/{uid}/{group}/{id} {
-      allow read, write: if owner(uid) && group in ['transactions', 'categories', 'accounts', 'config'];
+      allow read, write: if owner(uid) && group in ['transactions', 'categories', 'accounts', 'initialBalances', 'recurringRules', 'config'];
     }
   }
 }
