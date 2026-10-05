@@ -4,6 +4,9 @@ import {
   accountBalancesAt,
   accountTimeline,
 } from "../domain/initialBalances"
+import {
+  accountPeriodAmounts,
+} from "../domain/movements"
 import { useState } from "react"
 import { useData } from "../data/context"
 import Info from "../components/Info"
@@ -126,38 +129,28 @@ export default function Dashboard() {
         })
 
   /*
-   * Soldes des comptes.
+   * Cartes des comptes.
    *
-   * Le filtre mensuel affiche
-   * le solde à la fin du mois,
-   * et non uniquement les
-   * mouvements de ce mois.
+   * Pour un mois précis :
+   * uniquement la variation nette
+   * produite par les opérations
+   * de ce mois.
+   *
+   * Pour « Tous les mois » :
+   * solde global avec les montants
+   * initiaux et tout l'historique.
    */
-  const cutoffTimestamp =
-    moisFiltre === "all"
-      ? Infinity
-      : (() => {
-          const [year, month] =
-            moisFiltre
-              .split("-")
-              .map(Number)
-
-          return (
-            Date.UTC(
-              year,
-              month,
-              1
-            ) - 1
-          )
-        })()
-
   const soldes =
-    accountBalancesAt(
-      accounts,
-      transactions,
-      initialBalances,
-      cutoffTimestamp
-    )
+    moisFiltre === "all"
+      ? accountBalancesAt(
+          accounts,
+          transactions,
+          initialBalances
+        )
+      : accountPeriodAmounts(
+          accounts,
+          filtrees
+        )
 
   let totalSorties = 0
 

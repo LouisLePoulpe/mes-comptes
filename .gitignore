@@ -37,3 +37,4 @@ import-comptes/serviceAccount.json.json
 android/app/google-services.json
 *.jks
 *.keystore
+.release/
