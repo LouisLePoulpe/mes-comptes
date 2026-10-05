@@ -1,43 +1,310 @@
-export async function digest(value) {
-  const bytes = new TextEncoder().encode(value)
-  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), byte => byte.toString(16).padStart(2, '0')).join('')
+/*
+ * ============================================================
+ * POULPÉCULE V2.1
+ * Plan d'import exact basé sur les IDs.
+ * ============================================================
+ */
+
+export const V21_IMPORT_GROUPS =
+  Object.freeze([
+    'accounts',
+    'categories',
+    'initialBalances',
+    'transactions',
+    'recurringRules',
+  ])
+
+
+const V21_IMPORT_LABELS =
+  Object.freeze({
+    accounts:
+      'Comptes',
+
+    categories:
+      'Catégories',
+
+    initialBalances:
+      'Montants initiaux',
+
+    transactions:
+      'Transactions',
+
+    recurringRules:
+      'Transactions périodiques',
+  })
+
+
+function withoutId(
+  row
+) {
+  const data = {
+    ...row,
+  }
+
+  delete data.id
+
+  return data
 }
-const fingerprint = t => JSON.stringify([t.type, Math.round(t.montant * 100), t.banque, t.categorie.trim(), (t.description || '').trim(), t.date.slice(0, 10), ...(t.type === 'Transfert' ? [t.banqueDest] : [])])
-export async function planImport(records, mapping, existing, accounts, categories) {
-  const accountWrites = new Map(), categoryWrites = new Map(), seen = new Map()
-  const candidates = []
-  async function resolveAccount(bank) {
-    let accountId = mapping[bank]
-    if (!accountId) throw new Error(`Choisis un compte pour ${bank}.`)
-    if (accountId === '__new__') {
-      accountId = `import_${await digest(bank)}`
-      if (!accounts.some(a => a.id === accountId)) accountWrites.set(accountId, { name: bank, color: '#3e9950' })
-    } else if (!accounts.some(a => a.id === accountId)) throw new Error('Un compte de destination a changé. Recommence l’aperçu.')
-    return accountId
+
+
+function canonicalImportValue(
+  value
+) {
+  if (
+    Array.isArray(value)
+  ) {
+    return value.map(
+      canonicalImportValue
+    )
   }
-  for (const record of records) {
-    const data = { ...record, banque: await resolveAccount(record.banque), ...(record.type === 'Transfert' ? { banqueDest: await resolveAccount(record.banqueDest) } : {}) }
-    if (data.type === 'Transfert' && data.banque === data.banqueDest) throw new Error('Les comptes de départ et de destination doivent être différents.')
-    const key = fingerprint(data)
-    const occurrence = (seen.get(key) || 0) + 1
-    seen.set(key, occurrence)
-    candidates.push({ id: `import_${await digest(key)}_${occurrence}`, data, key })
+
+  if (
+    value &&
+    typeof value ===
+      'object'
+  ) {
+    return Object.fromEntries(
+      Object.keys(value)
+        .filter(
+          key =>
+            value[key] !==
+            undefined
+        )
+        .sort()
+        .map(
+          key => [
+            key,
+            canonicalImportValue(
+              value[key]
+            ),
+          ]
+        )
+    )
   }
-  const candidateIds = new Set(candidates.map(row => row.id))
-  const existingIds = new Set(existing.map(row => row.id))
-  const counts = new Map()
-  for (const row of existing) {
-    // A known import ID already represents its own occurrence, even if edited.
-    if (!candidateIds.has(row.id)) counts.set(fingerprint(row), (counts.get(fingerprint(row)) || 0) + 1)
+
+  return value
+}
+
+
+export function sameImportData(
+  left,
+  right
+) {
+  return (
+    JSON.stringify(
+      canonicalImportValue(
+        withoutId(left)
+      )
+    ) ===
+    JSON.stringify(
+      canonicalImportValue(
+        withoutId(right)
+      )
+    )
+  )
+}
+
+
+function importConflict(
+  group,
+  id
+) {
+  const error =
+    new Error(
+      `${V21_IMPORT_LABELS[group]} : l’ID « ${id} » existe déjà avec des données différentes. Aucun écrasement automatique n’est autorisé.`
+    )
+
+  error.code =
+    'IMPORT_CONFLICT'
+
+  error.collection =
+    group
+
+  error.documentId =
+    id
+
+  return error
+}
+
+
+
+export function assertImportV21Same(
+  group,
+  id,
+  incoming,
+  existing
+) {
+  if (
+    !sameImportData(
+      {
+        ...incoming,
+        id,
+      },
+      {
+        ...existing,
+        id,
+      }
+    )
+  ) {
+    throw importConflict(
+      group,
+      id
+    )
   }
-  const writes = []
-  let skipped = 0
-  for (const {id, data, key} of candidates) {
-    if (existingIds.has(id)) { skipped++; continue }
-    if (counts.get(key) > 0) { counts.set(key, counts.get(key) - 1); skipped++; continue }
-    writes.push({ id, data })
-    if (!categories.some(c => c.nom === data.categorie)) categoryWrites.set(`import_${await digest(data.categorie)}`, { nom: data.categorie })
+
+  return true
+}
+
+
+export function planImportV21(
+  source,
+  existing
+) {
+  const result = {
+    accounts: [],
+    categories: [],
+    initialBalances: [],
+    transactions: [],
+    recurringRules: [],
+
+    /*
+     * Toutes les lignes du fichier.
+     *
+     * Les tableaux ci-dessus servent
+     * uniquement à l'aperçu des créations.
+     *
+     * verify sert à la vérification
+     * transactionnelle finale : même une
+     * ligne déjà identique à l'aperçu doit
+     * être relue juste avant l'écriture.
+     */
+    verify: {
+      accounts: [],
+      categories: [],
+      initialBalances: [],
+      transactions: [],
+      recurringRules: [],
+    },
+
+    skipped: {
+      accounts: 0,
+      categories: 0,
+      initialBalances: 0,
+      transactions: 0,
+      recurringRules: 0,
+    },
+
+    totalToCreate: 0,
+    totalSkipped: 0,
   }
-  const usedAccounts = new Set(writes.flatMap(row => [row.data.banque, row.data.banqueDest].filter(Boolean)))
-  return { transactions: writes, accounts: [...accountWrites].filter(([id]) => usedAccounts.has(id)).map(([id, data]) => ({ id, data })), categories: [...categoryWrites].map(([id, data]) => ({ id, data })), skipped }
+
+
+  for (
+    const group
+    of V21_IMPORT_GROUPS
+  ) {
+    const incoming =
+      source[group]
+
+    const current =
+      existing[group]
+
+    if (
+      !Array.isArray(
+        incoming
+      ) ||
+      !Array.isArray(
+        current
+      )
+    ) {
+      throw new Error(
+        `Données d’import incomplètes pour « ${V21_IMPORT_LABELS[group]} ».`
+      )
+    }
+
+
+    const currentById =
+      new Map(
+        current.map(
+          row => [
+            row.id,
+            row,
+          ]
+        )
+      )
+
+
+    for (
+      const row
+      of incoming
+    ) {
+      /*
+       * Toujours conserver la version
+       * exacte venant du fichier.
+       *
+       * Elle sera revérifiée directement
+       * dans Firestore au moment du commit.
+       */
+      result.verify[group].push({
+        id: row.id,
+        data: withoutId(row),
+      })
+
+      const present =
+        currentById.get(
+          row.id
+        )
+
+      /*
+       * L'ID n'existe pas :
+       * l'enregistrement sera créé
+       * avec exactement le même ID.
+       */
+      if (!present) {
+        result[group].push({
+          id:
+            row.id,
+
+          data:
+            withoutId(row),
+        })
+
+        result.totalToCreate++
+        continue
+      }
+
+
+      /*
+       * Même ID et mêmes données :
+       * rien à faire.
+       */
+      if (
+        sameImportData(
+          row,
+          present
+        )
+      ) {
+        result.skipped[group]++
+        result.totalSkipped++
+        continue
+      }
+
+
+      /*
+       * Même ID mais contenu différent :
+       * on bloque l'import.
+       *
+       * Poulpécule ne choisit jamais
+       * automatiquement quelle version
+       * doit remplacer l'autre.
+       */
+      throw importConflict(
+        group,
+        row.id
+      )
+    }
+  }
+
+
+  return result
 }

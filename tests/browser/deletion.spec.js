@@ -21,7 +21,7 @@ test('wrong password preserves data; confirmed deletion removes auth and every V
   await page.getByRole('button', { name: 'Confirmer la suppression' }).click()
   await expect(page.getByRole('alert')).toContainText('interrompue')
   const list = async name => (await (await request.get('http://127.0.0.1:8080/v1/projects/demo-mes-comptes-v2/databases/(default)/documents/users/' + uid + '/' + name, { headers: { Authorization: 'Bearer owner' } })).json()).documents || []
-  expect((await list('categories')).length).toBe(3)
+  expect((await list('categories')).length).toBe(9)
   expect((await list('config')).length).toBeGreaterThan(0)
   await page.getByLabel('Mot de passe actuel').fill('password-fictif')
   await page.getByRole('button', { name: 'Réessayer la suppression' }).click()

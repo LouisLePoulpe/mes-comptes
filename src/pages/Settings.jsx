@@ -43,8 +43,8 @@ export default function Settings({ user, onImport, onAccounts, onCategories, onR
       <button onClick={onLogout} className="inline-flex items-center gap-2 bg-field rounded-xl px-4 py-2"><LogOut size={18} aria-hidden="true" />Se déconnecter</button>
     </div>
     <div className="bg-card rounded-xl p-4 space-y-3">
-      <h3 className="font-semibold">Import et export <Info title="Import et vérification"><p>Importe l’export complet de l’ancien compte et conserve cet ancien compte jusqu’à la fin des vérifications. La comparaison porte sur les transactions du fichier ; elle ne prouve pas que le fichier contient tout l’ancien historique.</p></Info></h3>
-      <button className="bg-blue-600 text-white rounded px-4 py-2" onClick={onImport}>Importer ou vérifier un export</button>
+      <h3 className="font-semibold">Import et export <Info title="Import et export V2.1"><p>L’export V2.1 contient les comptes, montants initiaux, catégories, transactions et périodicités avec leurs identifiants. L’import ne remplace jamais silencieusement une donnée existante.</p></Info></h3>
+      <button className="bg-blue-600 text-white rounded px-4 py-2" onClick={onImport}>Importer un export V2.1</button>
       <ExportActions />
     </div>
     <section aria-label="À propos" className="bg-card rounded-xl p-4 space-y-3">

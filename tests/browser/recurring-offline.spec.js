@@ -3,6 +3,8 @@ import {
   expect,
 } from '@playwright/test'
 
+import process from 'node:process'
+
 import {
   login,
   setup,
@@ -32,6 +34,11 @@ test(
     context,
     browser,
   }, info) => {
+    test.skip(
+      !process.env.OFFLINE_E2E,
+      'Requires built PWA and service worker'
+    )
+
     const email =
       `recurring-offline-${info.project.name}@example.test`
 

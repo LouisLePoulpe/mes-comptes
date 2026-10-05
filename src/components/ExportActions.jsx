@@ -1,14 +1,36 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../data/context'
-import { createExport, downloadExport, canShareExport, shareExport } from '../transfer/export'
+import { createExportV21, downloadExport, canShareExport, shareExport } from '../transfer/export'
 import { isAndroid, saveAndroidExport, shareAndroidExport } from '../transfer/native'
 
 export default function ExportActions() {
-  const { transactions, accounts } = useData()
+  const {
+    transactions,
+    accounts,
+    initialBalances,
+    categories,
+    recurringRules,
+  } = useData()
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   // Prebuild the file before the click so Web Share retains user activation.
-  const file = useMemo(() => createExport(transactions, id => accounts.find(a => a.id === id)?.name || id), [transactions, accounts])
+  const file = useMemo(
+    () =>
+      createExportV21({
+        accounts,
+        initialBalances,
+        categories,
+        transactions,
+        recurringRules,
+      }),
+    [
+      accounts,
+      initialBalances,
+      categories,
+      transactions,
+      recurringRules,
+    ]
+  )
   async function save() {
     setMessage('')
     if (!isAndroid()) { downloadExport(file); setMessage('Téléchargement lancé : mes-comptes.xlsx.'); return }

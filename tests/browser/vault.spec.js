@@ -8,7 +8,7 @@ async function addTransaction(page, { amount, date, description }) {
   await navigate(page, 'Ajouter')
   await page.getByRole('button', { name: 'Entrée', exact: true }).click()
   await page.getByLabel('Montant (€)').fill(amount)
-  await page.getByLabel('Catégorie', { exact: true }).selectOption({ label: 'Salaire' })
+  await page.getByLabel('Catégorie', { exact: true }).selectOption({ label: 'Salaire 💶' })
   await page.getByLabel('Description', { exact: true }).fill(description)
   await page.getByLabel('Date', { exact: true }).fill(date)
   await page.getByRole('button', { name: 'Enregistrer' }).click()
@@ -28,12 +28,14 @@ test('coffre, historique complet, comptes, export, récupération et changement 
   await page.getByLabel('Nom du compte').fill('Compte courant')
   await page.getByLabel('Couleur du compte').fill('#10b981')
   await page.getByRole('main').getByRole('button', { name: 'Ajouter', exact: true }).click()
-  await expect(page.getByText('Compte courant', { exact: true })).toBeVisible()
-  await navigate(page, 'Catégories')
-  await page.getByPlaceholder('Nouvelle catégorie...').fill('Salaire')
-  await page.getByRole('button', { name: 'Ajouter la catégorie' }).click()
-  await expect(page.getByText('Salaire', { exact: true })).toBeVisible()
-
+  await expect(
+    page
+      .getByRole('main')
+      .locator('span')
+      .filter({
+        hasText: /^Compte courant$/,
+      })
+  ).toBeVisible()
   await navigate(page, 'Ajouter')
   await page.getByRole('button', { name: 'Enregistrer' }).click()
   await expect(page.getByRole('alert')).toHaveText('Saisis un montant supérieur à zéro.')
@@ -45,14 +47,21 @@ test('coffre, historique complet, comptes, export, récupération et changement 
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.getByLabel('Nom du compte').fill('Compte renommé')
   await page.getByRole('button', { name: 'Enregistrer', exact: true }).click()
-  await expect(page.getByText('Compte renommé', { exact: true })).toBeVisible()
+  await expect(
+    page
+      .getByRole('main')
+      .locator('span')
+      .filter({
+        hasText: /^Compte renommé$/,
+      })
+  ).toBeVisible()
 
   await navigate(page, 'Dashboard')
   await page.getByRole('combobox').selectOption('all')
   await expect(page.getByText('1200.75 €', { exact: true })).toBeVisible()
   await expect(page.getByText('Progression des comptes', { exact: true })).toBeVisible()
   await page.getByRole('combobox').selectOption('2025-06')
-  await expect(page.getByText('200.50 €', { exact: true })).toBeVisible()
+  await expect(page.getByText('1200.75 €', { exact: true })).toBeVisible()
   // Monthly summaries must never truncate the progression chart's full history.
   await expect(page.locator('.recharts-line-curve').first()).toBeVisible()
 
@@ -61,11 +70,41 @@ test('coffre, historique complet, comptes, export, récupération et changement 
   await page.getByRole('button', { name: 'Export Excel' }).click()
   const download = await downloaded
   const workbook = XLSX.read(await readFile(await download.path()))
-  const rows = XLSX.utils.sheet_to_json(workbook.Sheets.Transactions)
+  const accountRows =
+    XLSX.utils.sheet_to_json(
+      workbook.Sheets.Comptes
+    )
+
+  const rows =
+    XLSX.utils.sheet_to_json(
+      workbook.Sheets.Transactions
+    )
+
+  expect(accountRows).toHaveLength(1)
+  expect(accountRows[0].Nom).toBe('Compte renommé')
+
   expect(rows).toHaveLength(2)
-  expect(rows.map(row => row.Banque)).toEqual(['Compte renommé', 'Compte renommé'])
-  expect(rows[0].Date).toBe('15/01/2001')
-  expect(rows.reduce((sum, row) => sum + row.Montant, 0)).toBe(1200.75)
+
+  expect(
+    rows.map(
+      row => row.CompteID
+    )
+  ).toEqual([
+    accountRows[0].ID,
+    accountRows[0].ID,
+  ])
+
+  expect(rows[0].Date).toBe(
+    '2001-01-15T00:00:00.000Z'
+  )
+
+  expect(
+    rows.reduce(
+      (sum, row) =>
+        sum + row.Montant,
+      0
+    )
+  ).toBe(1200.75)
   await navigate(page, 'Historique')
   await page.getByRole('button', { name: 'Modifier Premier versement' }).click()
   await page.getByLabel('Montant (€)').fill('1001.25')

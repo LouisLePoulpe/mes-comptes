@@ -113,6 +113,21 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
         categorie: category.nom,
         description: form.description,
         date: new Date(form.date).toISOString(),
+
+        /*
+         * Une occurrence générée doit conserver
+         * son identité périodique même après
+         * une modification manuelle.
+         */
+        ...(transaction.recurringRuleId
+          ? {
+              recurringRuleId:
+                transaction.recurringRuleId,
+
+              recurringOccurrence:
+                transaction.recurringOccurrence,
+            }
+          : {}),
       }
 
       await updateDoc(
@@ -345,10 +360,42 @@ export default function Historique({ cryptoKey }) {
 
 
   const supprimer = async (id) => {
-    if (confirm("Supprimer cette transaction ?")) {
+    const transaction =
+      transactions.find(
+        current =>
+          current.id === id
+      )
+
+    if (
+      transaction?.recurringRuleId
+    ) {
+      setError(
+        "Cette transaction provient d’une périodicité. Modifie ou désactive la règle périodique plutôt que de supprimer cette occurrence."
+      )
+
+      return
+    }
+
+    if (
+      confirm(
+        "Supprimer cette transaction ?"
+      )
+    ) {
       setError("")
-      try { await deleteDoc(userDoc(uid, "transactions", id)) }
-      catch { setError("Suppression impossible. La transaction a été conservée.") }
+
+      try {
+        await deleteDoc(
+          userDoc(
+            uid,
+            "transactions",
+            id
+          )
+        )
+      } catch {
+        setError(
+          "Suppression impossible. La transaction a été conservée."
+        )
+      }
     }
   }
 

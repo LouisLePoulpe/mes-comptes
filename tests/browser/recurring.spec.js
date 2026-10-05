@@ -218,6 +218,90 @@ test(
 
 
     /*
+     * Modifier une occurrence générée.
+     *
+     * Elle doit conserver ses métadonnées
+     * périodiques après l'enregistrement.
+     */
+    await page
+      .getByRole(
+        'button',
+        {
+          name:
+            'Modifier Test périodique automatique',
+        }
+      )
+      .first()
+      .click()
+
+    await expect(
+      page.getByRole(
+        'dialog',
+        {
+          name:
+            'Modifier la transaction',
+        }
+      )
+    ).toBeVisible()
+
+    await page
+      .getByLabel(
+        'Montant (€)'
+      )
+      .fill('43')
+
+    await page
+      .getByRole(
+        'button',
+        {
+          name: 'Sauvegarder',
+        }
+      )
+      .click()
+
+    await expect(
+      page.getByText(
+        '-43€',
+        {
+          exact: true,
+        }
+      )
+    ).toBeVisible()
+
+
+    /*
+     * Si recurringRuleId a bien été
+     * conservé, la suppression individuelle
+     * doit maintenant être bloquée.
+     */
+    await page
+      .getByRole(
+        'button',
+        {
+          name:
+            'Supprimer Test périodique automatique',
+        }
+      )
+      .first()
+      .click()
+
+    await expect(
+      page.getByRole('alert')
+    ).toContainText(
+      'Cette transaction provient d’une périodicité.'
+    )
+
+    await expect(
+      page.getByText(
+        '4 transactions',
+        {
+          exact: true,
+        }
+      )
+    ).toBeVisible()
+
+
+    /*
      * Recharger : aucune occurrence
      * ne doit être dupliquée.
      */

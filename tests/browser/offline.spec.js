@@ -11,7 +11,14 @@ test('offline cold start, edits, persistent queue and server reconciliation', as
   await navigate(page, 'Comptes')
   await page.getByLabel('Nom du compte').fill('Compte hors ligne')
   await page.getByRole('main').getByRole('button', { name: 'Ajouter', exact: true }).click()
-  await expect(page.getByText('Compte hors ligne', { exact: true })).toBeVisible()
+  await expect(
+    page
+      .getByRole('main')
+      .locator('span')
+      .filter({
+        hasText: /^Compte hors ligne$/,
+      })
+  ).toBeVisible()
   await navigate(page, 'Dashboard')
   await expect(page.getByRole('button', { name: 'Synchronisation : Synchronisé', exact: true })).toBeVisible()
   await page.screenshot({ path: info.outputPath('dashboard.png') })
@@ -27,7 +34,7 @@ test('offline cold start, edits, persistent queue and server reconciliation', as
   async function add(description) {
     await navigate(page, 'Ajouter')
     await page.getByLabel('Montant (€)').fill('12,50')
-    await page.getByLabel('Catégorie', { exact: true }).selectOption({ label: 'Charges' })
+    await page.getByLabel('Catégorie', { exact: true }).selectOption({ label: 'Charges 💸' })
     await page.getByLabel('Description', { exact: true }).fill(description)
     await page.getByRole('button', { name: 'Enregistrer' }).click()
     await expect(page.getByRole('heading', { name: 'Historique', exact: true })).toBeVisible()
