@@ -1,6 +1,6 @@
 # Mes Comptes Android
 
-Release status (2.1.0): the owner validated Android document export. A stable-key
+Release status (2.1.1): the owner validated Android document export. A stable-key
 release with Google configured was built from commit eda54ea. Full native Google
 sign-in remains to be confirmed on device. The preview instructions below describe
 test variants, not the signed release linked from the README.
