@@ -57,6 +57,7 @@ export function assertCategoryFlow(category, flow) {
 }
 
 export const DEFAULT_CATEGORIES_V21 = CATEGORY_ROLES.map(role => ({
+  id: `default_${role.id}`,
   nom: role.name,
   roleId: role.id,
   defaultRole: true,
