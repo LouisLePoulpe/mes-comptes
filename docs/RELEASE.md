@@ -1,11 +1,11 @@
-# Poulpécule 2.0.0
+# Poulpécule 2.1.0
 
 Android export to the document picker was validated by the owner after the fix.
 The website production build is `npm run build:production`; `npm run deploy`
 builds with the real Firebase project and publishes only static assets to gh-pages.
 It never deploys Firestore rules, migrates records or removes user accounts.
 
-Android release builds use versionCode 20000 and a stable private signing key.
+Android release builds use versionCode 20100 and a stable private signing key.
 Increment versionCode for each subsequent release. Debug builds have a -test suffix.
 The manual Android signed release workflow requires three repository secrets:
 ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_GOOGLE_SERVICES_JSON.
