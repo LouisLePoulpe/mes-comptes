@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { onSnapshot } from 'firebase/firestore'
+import { onSnapshot, getDocsFromCache, getDocFromCache } from 'firebase/firestore'
 import { setDoc } from './offline'
 import { decrypt, encrypt } from '../crypto'
 import { userCollection, userDoc } from './references'
@@ -41,8 +41,8 @@ export default function DataProvider({ uid, cryptoKey, children }) {
     let active = true
     const stops = COLLECTIONS.map(name => {
       let revision = 0
-      return onSnapshot(name === 'preferences' ? userDoc(uid, 'config', 'dashboard') : userCollection(uid, name), { includeMetadataChanges: true }, async snapshot => {
-        const current = ++revision
+      const ref = name === 'preferences' ? userDoc(uid, 'config', 'dashboard') : userCollection(uid, name)
+      const applySnapshot = async (snapshot, current) => {
         try {
           const rows = await Promise.all((name === 'preferences' ? (snapshot.exists() ? [snapshot] : []) : snapshot.docs).map(async document => ({
             ...await decrypt(document.data(), cryptoKey), id: document.id,
@@ -57,7 +57,16 @@ export default function DataProvider({ uid, cryptoKey, children }) {
             error: 'Impossible de déchiffrer les données. Aucun historique partiel ne sera affiché.',
           } }))
         }
-      }, () => {
+      }
+      // Optional preferences may never have been created. A listener can wait
+      // for the network before confirming absence; don't hold the UI for it.
+      const cached = name === 'preferences' ? getDocFromCache(ref) : getDocsFromCache(ref)
+      cached.then(snapshot => { if (revision === 0) return applySnapshot(snapshot, 0) }).catch(error => {
+        if (active && revision === 0 && name === 'preferences' && error.code === 'unavailable') {
+          setData(previous => ({ ...previous, preferences: { rows: [], pending: false, cached: true } }))
+        }
+      })
+      return onSnapshot(ref, { includeMetadataChanges: true }, snapshot => applySnapshot(snapshot, ++revision), () => {
         revision++ // Invalidate decryptions that were still in flight when the listener failed.
         if (active) setData(previous => ({ ...previous, [name]: {
           error: 'Accès aux données impossible. Vérifie ta connexion et les autorisations.',

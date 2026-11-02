@@ -2,6 +2,56 @@ import { test, expect } from '@playwright/test'
 import process from 'node:process'
 import { login, setup, navigate } from './helpers'
 
+test('cached startup does not wait for an unresponsive network or expired token', async ({ page, context }, info) => {
+  test.skip(!process.env.OFFLINE_E2E, 'Requires built PWA')
+  await page.goto('./')
+  await login(page, `slow-network-${info.project.name}@example.test`)
+  await setup(page)
+  await expect(page.getByRole('button', { name: 'Synchronisation : Synchronisé', exact: true })).toBeVisible()
+  await page.evaluate(() => navigator.serviceWorker.ready)
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Synchronisation : Synchronisé', exact: true })).toBeVisible()
+  // Force token renewal on next boot, as after a long time without using the app.
+  await page.evaluate(() => new Promise((resolve, reject) => {
+    const request = indexedDB.open('firebaseLocalStorageDb')
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => {
+      const db = request.result
+      const tx = db.transaction('firebaseLocalStorage', 'readwrite')
+      const store = tx.objectStore('firebaseLocalStorage')
+      const cursor = store.openCursor()
+      cursor.onsuccess = () => {
+        const row = cursor.result
+        if (!row) return
+        const record = row.value
+        if (record.value?.stsTokenManager) { record.value.stsTokenManager.expirationTime = 1; row.update(record) }
+        row.continue()
+      }
+      tx.oncomplete = () => { db.close(); resolve() }
+      tx.onerror = () => reject(tx.error)
+    }
+  }))
+  let releaseNetwork
+  const unavailable = new Promise(resolve => { releaseNetwork = resolve })
+  await context.route(url => ['8080', '9099'].includes(url.port), async route => {
+    await unavailable
+    await route.continue().catch(() => {})
+  })
+  try {
+    const start = Date.now()
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 3000 })
+    expect(Date.now() - start).toBeLessThan(3500)
+    expect(await page.evaluate(() => navigator.onLine)).toBe(true)
+    await navigate(page, 'Historique')
+    await expect(page.getByRole('heading', { name: 'Historique', exact: true })).toBeVisible()
+    console.log(`${info.project.name}: cached startup ${Date.now() - start} ms with network requests held`)
+  } finally { releaseNetwork() }
+  await expect(page.getByRole('button', { name: 'Synchronisation : Synchronisé', exact: true })).toBeVisible({ timeout: 30000 })
+  // Background refresh must not send the user back to Dashboard.
+  await expect(page.getByRole('heading', { name: 'Historique', exact: true })).toBeVisible()
+})
+
 test('offline cold start, edits, persistent queue and server reconciliation', async ({ page, context, browser }, info) => {
   test.skip(!process.env.OFFLINE_E2E, 'Requires built PWA to restart with no network')
   const email = `offline-${info.project.name}@example.test`

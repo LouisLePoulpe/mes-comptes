@@ -3,6 +3,7 @@ import { Capacitor } from "@capacitor/core"
 import { useState, useEffect } from "react"
 import { auth } from "./firebase"
 import { onIdTokenChanged } from "firebase/auth"
+import { onSnapshot } from 'firebase/firestore'
 import { getVaultDoc } from "./data/offline"
 import { loadKeyLocally, clearKeyLocally, decrypt } from "./crypto"
 import { userDoc } from "./data/references"
@@ -54,7 +55,13 @@ function Application() {
 
   useEffect(() => {
     let generation = 0
+    let identity
+    let stopVault = () => {}
     const unsub = onIdTokenChanged(auth, async (u) => {
+      const nextIdentity = u ? `${u.uid}:${u.emailVerified}` : 'signed-out'
+      if (identity === nextIdentity) return
+      identity = nextIdentity
+      stopVault()
       const current = ++generation
       setUser(u)
       setCryptoKey(null)
@@ -78,6 +85,18 @@ function Application() {
           if (current !== generation) return
           setCryptoKey(key)
           setCryptoState(!config.exists() ? "setup" : key ? "ready" : "unlock")
+          if (config.exists()) {
+            // Validate the cached vault in the background. A server denial or
+            // deletion must not be hidden by the cache-first startup.
+            const stops = [config, verif].filter(Boolean).map(original => onSnapshot(original.ref, snapshot => {
+              if (current !== generation || snapshot.metadata.fromCache) return
+              if (!snapshot.exists()) setError('Ce coffre n’est plus accessible. Vérifie ton compte.')
+              else if (JSON.stringify(snapshot.data()) !== JSON.stringify(original.data())) setAttempt(value => value + 1)
+            }, () => {
+              if (current === generation) setError('Accès au coffre refusé. Vérifie les autorisations de ton compte.')
+            }))
+            stopVault = () => stops.forEach(stop => stop())
+          }
         }
       } catch {
         if (current === generation) setError("Coffre indisponible sur cet appareil. Reconnecte-toi à Internet pour le télécharger, puis réessaie.")
@@ -85,7 +104,7 @@ function Application() {
         if (current === generation) setLoading(false)
       }
     })
-    return () => { generation++; unsub() }
+    return () => { generation++; stopVault(); unsub() }
   }, [attempt])
 
   const handleComplete = (key) => {

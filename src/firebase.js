@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator, CACHE_SIZE_UNLIMITED } from "firebase/firestore";
-import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, connectAuthEmulator, reload } from "firebase/auth";
+import { limitStartupAuthRequests } from './data/startupAuth';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCv0O8yCEC0FCdZ_6gDejrRGmY5ddIWghU",
@@ -18,7 +19,17 @@ const app = initializeApp(useProduction ? firebaseConfig : { ...firebaseConfig, 
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager(), cacheSizeBytes: CACHE_SIZE_UNLIMITED }),
 });
+const restoreFetch = limitStartupAuthRequests(firebaseConfig.apiKey, useProduction ? undefined : 'http://127.0.0.1:9099');
 export const auth = getAuth(app);
+auth.authStateReady().then(() => {
+  restoreFetch();
+  // Server validation continues after the local interface has had time to open.
+  const refresh = () => {
+    if (navigator.onLine && auth.currentUser) reload(auth.currentUser).catch(() => { /* The SDK handles invalid sessions; network failures keep the local user. */ });
+  };
+  setTimeout(refresh, 2000);
+  window.addEventListener('online', refresh);
+}, restoreFetch);
 auth.languageCode = "fr";
 export const googleProvider = new GoogleAuthProvider();
 

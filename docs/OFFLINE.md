@@ -1,5 +1,24 @@
 # Fonctionnement hors connexion — 2.0.2
 
+## Démarrage local prioritaire depuis la 2.1.2
+
+Le coffre est lu depuis IndexedDB en premier, même si le téléphone annonce une
+connexion sans accès effectif à Internet. Les collections et les préférences
+optionnelles sont chargées explicitement depuis le cache avant les réponses des
+listeners réseau. La restauration initiale de Firebase Auth est limitée à 800 ms
+par requête de consultation du compte ou de renouvellement du jeton. Cela utilise
+le comportement du SDK qui conserve sa session persistée en cas d’erreur réseau.
+Les autres requêtes, notamment connexion et réauthentification, ne sont pas
+interceptées. La fonction fetch originale est restaurée dès la session initialisée.
+Une validation du compte reprend en arrière-plan après deux secondes et au retour
+du réseau. Les changements/refus du coffre sont surveillés en arrière-plan ; un
+rafraîchissement de jeton ne remet plus l’utilisateur sur le Dashboard.
+
+Le test de démarrage rapide bloque les requêtes Auth et Firestore tout en gardant
+`navigator.onLine` à true, avec un jeton expiré. Il exige une ouverture en moins de
+3,5 secondes et vérifie ensuite la reprise de synchronisation sans quitter
+l’historique. Ce seuil est une régression de test, pas une garantie sur tout appareil.
+
 Après installation de cette version, ouvrir une fois l’application avec Internet
 et attendre que l’icône de synchronisation devienne verte. Le coffre, l’historique complet et les paramètres
 sont alors disponibles sur cet appareil. Ne pas désinstaller ou effacer les

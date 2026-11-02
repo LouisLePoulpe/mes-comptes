@@ -2,7 +2,14 @@ import { doc, getDoc, getDocFromCache, onSnapshot, setDoc as firestoreSet, updat
 
 // Never interpret a missing offline cache as a new/empty vault.
 export async function getVaultDoc(ref) {
-  const snapshot = navigator.onLine ? await getDoc(ref) : await getDocFromCache(ref)
+  // navigator.onLine can be true with no usable Internet (Wi-Fi without uplink).
+  // Always consult IndexedDB first, including when a network is reported.
+  try {
+    const cached = await getDocFromCache(ref)
+    if (cached.exists()) return cached
+  } catch (error) { if (error.code !== 'unavailable') throw error }
+  if (!navigator.onLine) throw new Error('Connecte cet appareil une première fois pour télécharger ton coffre.')
+  const snapshot = await getDoc(ref)
   if (!snapshot.exists() && snapshot.metadata.fromCache) {
     throw new Error('Connecte cet appareil une première fois pour télécharger ton coffre.')
   }
