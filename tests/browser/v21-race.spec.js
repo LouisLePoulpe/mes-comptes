@@ -68,7 +68,9 @@ test(
             setDoc,
           } =
             await import(
-              '/mes-comptes/src/data/offline.js'
+              // Simulate another device's completed server write, not merely
+              // a locally queued mutation racing the import's server read.
+              '/mes-comptes/tests/browser/fixtures/firestore-client.js'
             )
 
           const uid =

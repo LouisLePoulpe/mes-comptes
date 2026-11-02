@@ -61,7 +61,7 @@ test('coffre, historique complet, comptes, export, récupération et changement 
   await expect(page.getByText('1200.75 €', { exact: true })).toBeVisible()
   await expect(page.getByText('Progression des comptes', { exact: true })).toBeVisible()
   await page.getByRole('combobox').selectOption('2025-06')
-  await expect(page.getByText('1200.75 €', { exact: true })).toBeVisible()
+  await expect(page.getByText('200.50 €', { exact: true })).toBeVisible()
   // Monthly summaries must never truncate the progression chart's full history.
   await expect(page.locator('.recharts-line-curve').first()).toBeVisible()
 
