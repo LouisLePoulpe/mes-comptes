@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator, CACHE_SIZE_UNLIMITED } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager, connectFirestoreEmulator, CACHE_SIZE_UNLIMITED } from "firebase/firestore";
+import { Capacitor } from "@capacitor/core";
 import { getAuth, GoogleAuthProvider, connectAuthEmulator, reload } from "firebase/auth";
 import { limitStartupAuthRequests } from './data/startupAuth';
 
@@ -16,8 +17,14 @@ const useProduction = import.meta.env.VITE_V2_USE_PRODUCTION === 'true';
 const app = initializeApp(useProduction ? firebaseConfig : { ...firebaseConfig, projectId: 'demo-mes-comptes-v2' });
 // Keep the complete encrypted Firestore cache on the device. Firestore queues
 // writes while offline and flushes them automatically when connectivity returns.
+// The Android app has a single WebView: take ownership of the cache directly
+// instead of negotiating a multi-tab lease with a possibly dead previous process.
+// The website keeps multi-tab support.
+const tabManager = Capacitor.isNativePlatform()
+  ? persistentSingleTabManager({ forceOwnership: true })
+  : persistentMultipleTabManager();
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager(), cacheSizeBytes: CACHE_SIZE_UNLIMITED }),
+  localCache: persistentLocalCache({ tabManager, cacheSizeBytes: CACHE_SIZE_UNLIMITED }),
 });
 const restoreFetch = limitStartupAuthRequests(firebaseConfig.apiKey, useProduction ? undefined : 'http://127.0.0.1:9099');
 export const auth = getAuth(app);
