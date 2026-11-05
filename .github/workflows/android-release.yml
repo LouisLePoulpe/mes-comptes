@@ -1,8 +1,13 @@
 name: Android signed release
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag de release à publier avec l'APK (ex. v2.1.2). Laisser vide pour ne produire que l'artefact."
+        required: false
+        default: ""
 permissions:
-  contents: read
+  contents: write
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -47,6 +52,22 @@ jobs:
           name: poulpecule-2.1.2-release
           path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
+      - name: Publish APK as GitHub release
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          cp android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/Poulpecule-$VERSION.apk"
+          # The tag is created on the current head of main if it does not exist yet.
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/Poulpecule-$VERSION.apk" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$RUNNER_TEMP/Poulpecule-$VERSION.apk" \
+              --target main --title "Poulpécule $VERSION" \
+              --notes "APK Android signé de Poulpécule $VERSION. Pour mettre à jour une installation existante, installe simplement cet APK par-dessus : il est signé avec la même clé que les versions précédentes."
+          fi
       - name: Remove private build files
         if: always()
         run: |
