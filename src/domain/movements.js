@@ -1,6 +1,10 @@
+import { effectiveAmount } from './reimbursement.js'
+
 export function accountMovements(transaction) {
   if (transaction.type === 'Transfert') return [[transaction.banque, -transaction.montant], [transaction.banqueDest, transaction.montant]]
-  return [[transaction.banque, transaction.type === 'Entrée' ? transaction.montant : -transaction.montant]]
+  // Une dépense remboursée compte pour 0 (effectiveAmount).
+  const amount = effectiveAmount(transaction)
+  return [[transaction.banque, transaction.type === 'Entrée' ? amount : -amount]]
 }
 
 export function accountPeriodAmounts(

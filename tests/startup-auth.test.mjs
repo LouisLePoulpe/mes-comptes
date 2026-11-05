@@ -26,3 +26,25 @@ test('startup deadline aborts only the project lookup/token requests and restore
     assert.equal(await fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=project-key'), 'untouched')
   } finally { restore(); globalThis.fetch = previous }
 })
+
+test('startup lookup/token fail immediately when the device reports no network', async () => {
+  const previous = globalThis.fetch
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+  let calls = 0
+  globalThis.fetch = async () => { calls++; return 'network' }
+  Object.defineProperty(globalThis, 'navigator', { value: { onLine: false }, configurable: true })
+  const restore = limitStartupAuthRequests('project-key', undefined, 5000)
+  try {
+    const started = Date.now()
+    await assert.rejects(fetch('https://securetoken.googleapis.com/v1/token?key=project-key'), TypeError)
+    await assert.rejects(fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=project-key'), TypeError)
+    assert.ok(Date.now() - started < 500)
+    assert.equal(calls, 0)
+    // Sign-in is never intercepted, even offline: the SDK reports its own error.
+    assert.equal(await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=project-key'), 'network')
+    assert.equal(calls, 1)
+  } finally {
+    restore(); globalThis.fetch = previous
+    if (descriptor) Object.defineProperty(globalThis, 'navigator', descriptor); else delete globalThis.navigator
+  }
+})

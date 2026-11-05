@@ -1,6 +1,6 @@
 import { App as NativeApp } from "@capacitor/app"
 import { Capacitor } from "@capacitor/core"
-import { useState, useEffect } from "react"
+import { useState, useEffect, lazy, Suspense } from "react"
 import { auth } from "./firebase"
 import { onIdTokenChanged } from "firebase/auth"
 import { onSnapshot } from 'firebase/firestore'
@@ -9,7 +9,6 @@ import { loadKeyLocally, clearKeyLocally, decrypt } from "./crypto"
 import { userDoc } from "./data/references"
 import { logoutGoogle } from "./nativeAuth"
 import Login, { VerifyEmail } from "./components/Login"
-import Importer from "./pages/Importer"
 import DataProvider from "./data/DataProvider"
 import Settings from "./pages/Settings"
 import Accounts from "./pages/Accounts"
@@ -17,11 +16,15 @@ import Dashboard from "./pages/Dashboard"
 import Historique from "./pages/Historique"
 import Ajouter from "./pages/Ajouter"
 import Categories from "./pages/Categories"
-import Recurring from "./pages/Recurring"
 import Setup from "./pages/Setup"
 import Unlock from "./pages/Unlock"
 import { LayoutDashboard, History, PlusCircle, Settings as SettingsIcon } from "lucide-react"
 import { deleteCurrentAccount, deletionPending } from './accountDeletion'
+
+// Rarely opened and heavy (Excel parsing, recurrence editor): loaded on demand so
+// the first screen does not wait for their code to be downloaded and parsed.
+const Importer = lazy(() => import("./pages/Importer"))
+const Recurring = lazy(() => import("./pages/Recurring"))
 
 export default function App() {
   return <Application />
@@ -72,12 +75,23 @@ function Application() {
       if (u && deletionPending(u.uid)) { setLoading(false); return }
       try {
         if (u && !(u.providerData.some(provider => provider.providerId === "password") && !u.emailVerified)) {
-          const config = await getVaultDoc(userDoc(u.uid, "config", "crypto"))
-          const verif = config.exists() ? await getVaultDoc(userDoc(u.uid, "config", "verif")) : null
+          // Read both vault documents and import the stored key at the same time:
+          // all three come from the local cache and do not depend on each other.
+          const localKey = loadKeyLocally(u.uid).then(value => ({ value }), error => ({ error }))
+          const [configRead, verifRead] = await Promise.allSettled([
+            getVaultDoc(userDoc(u.uid, "config", "crypto")),
+            getVaultDoc(userDoc(u.uid, "config", "verif")),
+          ])
+          if (configRead.status === "rejected") throw configRead.reason
+          const config = configRead.value
+          if (config.exists() && verifRead.status === "rejected") throw verifRead.reason
+          const verif = config.exists() ? verifRead.value : null
           let key = null
           if (config.exists()) {
             try {
-              const local = await loadKeyLocally(u.uid)
+              const stored = await localKey
+              if (stored.error) throw stored.error
+              const local = stored.value
               if (local && local.saltHex === config.data().saltHex && verif.exists() &&
                   (await decrypt(verif.data().encrypted, local.key)).verif === "ok") key = local.key
             } catch { clearKeyLocally(u.uid) }
@@ -179,8 +193,10 @@ function Application() {
         {page === "historique" && <Historique cryptoKey={cryptoKey} />}
         {page === "ajouter" && <Ajouter cryptoKey={cryptoKey} onSuccess={() => setPage("historique")} />}
         {page === "categories" && <Categories cryptoKey={cryptoKey} />}
-        {page === "recurring" && <Recurring cryptoKey={cryptoKey} />}
-        {page === "import" && <Importer cryptoKey={cryptoKey} onClose={() => setPage("settings")} />}
+        <Suspense fallback={null}>
+          {page === "recurring" && <Recurring cryptoKey={cryptoKey} />}
+          {page === "import" && <Importer cryptoKey={cryptoKey} onClose={() => setPage("settings")} />}
+        </Suspense>
         {page === "settings" && <Settings user={user} onLogout={logout} onAccounts={() => setPage("accounts")} onCategories={() => setPage("categories")} onRecurring={() => setPage("recurring")} onImport={() => setPage("import")} onDelete={deleteAccount} />}
         {page === "accounts" && <Accounts cryptoKey={cryptoKey} />}
       </main>

@@ -5,14 +5,23 @@
 Le coffre est lu depuis IndexedDB en premier, même si le téléphone annonce une
 connexion sans accès effectif à Internet. Les collections et les préférences
 optionnelles sont chargées explicitement depuis le cache avant les réponses des
-listeners réseau. La restauration initiale de Firebase Auth est limitée à 800 ms
-par requête de consultation du compte ou de renouvellement du jeton. Cela utilise
+listeners réseau. La restauration initiale de Firebase Auth échoue immédiatement
+quand l'appareil se déclare hors ligne, et est limitée à 500 ms par requête de
+consultation du compte ou de renouvellement du jeton quand un réseau est annoncé
+sans accès réel. Cela utilise
 le comportement du SDK qui conserve sa session persistée en cas d’erreur réseau.
 Les autres requêtes, notamment connexion et réauthentification, ne sont pas
 interceptées. La fonction fetch originale est restaurée dès la session initialisée.
 Une validation du compte reprend en arrière-plan après deux secondes et au retour
 du réseau. Les changements/refus du coffre sont surveillés en arrière-plan ; un
 rafraîchissement de jeton ne remet plus l’utilisateur sur le Dashboard.
+
+Pour réduire le travail avant le premier écran : les deux documents du coffre et
+la clé locale sont lus en parallèle ; chaque donnée chiffrée n'est déchiffrée
+qu'une seule fois (les snapshots répétés du démarrage réutilisent le résultat, et
+un snapshot sans changement ne relance aucun calcul) ; l'import Excel, l'export
+et l'écran des périodiques ne sont chargés qu'à leur ouverture ; sur Android, le
+cache Firestore est en mode mono-onglet, sans négociation de bail multi-onglets.
 
 Le test de démarrage rapide bloque les requêtes Auth et Firestore tout en gardant
 `navigator.onLine` à true, avec un jeton expiré. Il exige une ouverture en moins de

@@ -12,10 +12,24 @@ import { deleteDoc, updateDoc } from "../data/offline"
 import { encrypt } from "../crypto"
 import { Trash2, Pencil, X, Filter } from "lucide-react"
 import { matchesDescription } from "../domain/search"
+import {
+  REIMBURSED_BY_MAX_LENGTH,
+  isReimbursed,
+  reimbursementFields,
+  reimbursers,
+} from "../domain/reimbursement"
 import SyncStatus from '../components/SyncStatus'
 
+const todayLocal = () => {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+}
+
+const formatDay = day => new Date(`${day}T00:00:00`).toLocaleDateString("fr-FR")
+
 function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
-  const { uid, accounts } = useData()
+  const { uid, accounts, transactions } = useData()
+  const suggestions = reimbursers(transactions)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
 
@@ -27,6 +41,9 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
     categoryId: transaction.categoryId || "",
     description: transaction.description || "",
     date: transaction.date?.split("T")[0] ?? transaction.date,
+    reimbursed: isReimbursed(transaction),
+    reimbursedAt: transaction.reimbursedAt || "",
+    reimbursedBy: transaction.reimbursedBy || "",
   })
 
   const set = (key, value) =>
@@ -99,6 +116,18 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
       )
     }
 
+    let reimbursement
+
+    try {
+      // Seule une dépense peut être remboursée : sinon les champs sont ignorés.
+      reimbursement =
+        form.type === FLOWS.EXPENSE && form.reimbursed
+          ? reimbursementFields(form.type, form)
+          : {}
+    } catch (cause) {
+      return setError(cause.message)
+    }
+
     setSaving(true)
 
     try {
@@ -113,6 +142,7 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
         categorie: category.nom,
         description: form.description,
         date: new Date(form.date).toISOString(),
+        ...reimbursement,
 
         /*
          * Une occurrence générée doit conserver
@@ -319,6 +349,84 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
             className="w-full bg-card border border-line rounded-xl px-4 py-3 text-foreground"
           />
         </div>
+
+        {form.type === FLOWS.EXPENSE && (
+          <div className="flex flex-col gap-3 bg-card rounded-xl p-4">
+            <label className="flex items-center gap-3 font-semibold">
+              <input
+                type="checkbox"
+                checked={form.reimbursed}
+                onChange={event =>
+                  setForm(previous => ({
+                    ...previous,
+                    reimbursed: event.target.checked,
+                    reimbursedAt:
+                      event.target.checked && !previous.reimbursedAt
+                        ? todayLocal()
+                        : previous.reimbursedAt,
+                  }))
+                }
+                className="w-5 h-5"
+              />
+              Dépense remboursée
+            </label>
+
+            {form.reimbursed && (
+              <>
+                <p className="text-xs text-muted">
+                  Une dépense remboursée compte pour 0 dans le solde du compte et dans les statistiques.
+                  Ne saisis pas en plus le remboursement reçu comme une entrée.
+                </p>
+
+                <div>
+                  <label
+                    htmlFor="Historique-remboursement-date"
+                    className="text-sm text-muted mb-1 block"
+                  >
+                    Date du remboursement
+                  </label>
+
+                  <input
+                    type="date"
+                    id="Historique-remboursement-date"
+                    value={form.reimbursedAt}
+                    onChange={event =>
+                      set("reimbursedAt", event.target.value)
+                    }
+                    className="w-full bg-field border border-line rounded-xl px-4 py-3 text-foreground"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="Historique-remboursement-par"
+                    className="text-sm text-muted mb-1 block"
+                  >
+                    Remboursée par
+                  </label>
+
+                  <input
+                    id="Historique-remboursement-par"
+                    list="Historique-remboursement-noms"
+                    value={form.reimbursedBy}
+                    maxLength={REIMBURSED_BY_MAX_LENGTH}
+                    onChange={event =>
+                      set("reimbursedBy", event.target.value)
+                    }
+                    placeholder="Ex : Pierre, Mutuelle, KNDS..."
+                    className="w-full bg-field border border-line rounded-xl px-4 py-3 text-foreground"
+                  />
+
+                  <datalist id="Historique-remboursement-noms">
+                    {suggestions.map(name => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {error && (
           <p role="alert" className="text-negative">
@@ -556,7 +664,7 @@ export default function Historique({ cryptoKey }) {
         {filtrées.map(t => (
           <div key={t.id} className="bg-card rounded-xl px-4 py-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <span className={`text-lg font-bold shrink-0 ${t.type === "Transfert" ? "text-link" : t.type === "Entrée" ? "text-positive" : "text-negative"}`}>
+              <span className={`text-lg font-bold shrink-0 ${isReimbursed(t) ? "text-muted line-through" : t.type === "Transfert" ? "text-link" : t.type === "Entrée" ? "text-positive" : "text-negative"}`}>
                 {t.type === "Transfert" ? "↔ " : t.type === "Entrée" ? "+" : "-"}{t.montant}€
               </span>
               <div className="min-w-0">
@@ -564,6 +672,11 @@ export default function Historique({ cryptoKey }) {
                 <p className="text-xs text-muted">
                   {accountName(t.banque)}{t.type === "Transfert" ? ` → ${accountName(t.banqueDest)}` : ""} · {t.categorie} · {new Date(t.date).toLocaleDateString("fr-FR")}
                 </p>
+                {isReimbursed(t) && (
+                  <p className="text-xs text-positive">
+                    Remboursée le {formatDay(t.reimbursedAt)} par {t.reimbursedBy}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex gap-2 shrink-0">
