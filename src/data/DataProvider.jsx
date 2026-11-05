@@ -3,6 +3,7 @@ import { onSnapshot, getDocsFromCache, getDocFromCache } from 'firebase/firestor
 import { setDoc } from './offline'
 import { decrypt, encrypt } from '../crypto'
 import { userCollection, userDoc } from './references'
+import { createRowDecryptor, reuseRows } from './decryptCache'
 import { DataContext } from './context'
 import { planRecurringOccurrences } from '../domain/recurring'
 
@@ -41,17 +42,22 @@ export default function DataProvider({ uid, cryptoKey, children }) {
     let active = true
     const stops = COLLECTIONS.map(name => {
       let revision = 0
+      const decryptor = createRowDecryptor(encrypted => decrypt(encrypted, cryptoKey))
       const ref = name === 'preferences' ? userDoc(uid, 'config', 'dashboard') : userCollection(uid, name)
       const applySnapshot = async (snapshot, current) => {
         try {
-          const rows = await Promise.all((name === 'preferences' ? (snapshot.exists() ? [snapshot] : []) : snapshot.docs).map(async document => ({
-            ...await decrypt(document.data(), cryptoKey), id: document.id,
-          })))
+          const documents = name === 'preferences' ? (snapshot.exists() ? [snapshot] : []) : snapshot.docs
+          const decrypted = await Promise.all(documents.map(document => decryptor.row(document.id, document.data())))
+          decryptor.retain(new Set(documents.map(document => document.id)))
+          // Sorting must not mutate rows shared with the previous state.
+          const rows = [...decrypted]
           if (name === 'accounts' || name === 'categories') rows.sort((a,b) => (a.name || a.nom).localeCompare(b.name || b.nom, 'fr', { numeric: true, sensitivity: 'base' }))
           if (name === 'transactions') rows.sort((a, b) => new Date(a.date) - new Date(b.date))
           if (name === 'initialBalances') rows.sort((a, b) => new Date(a.date) - new Date(b.date) || (a.label || '').localeCompare(b.label || '', 'fr'))
           if (name === 'recurringRules') rows.sort((a, b) => new Date(a.startDate) - new Date(b.startDate) || (a.description || '').localeCompare(b.description || '', 'fr'))
-          if (active && current === revision) setData(previous => ({ ...previous, [name]: { rows, pending: snapshot.metadata.hasPendingWrites, cached: snapshot.metadata.fromCache } }))
+          if (active && current === revision) setData(previous => ({ ...previous, [name]: {
+            rows: reuseRows(previous[name]?.rows, rows), pending: snapshot.metadata.hasPendingWrites, cached: snapshot.metadata.fromCache,
+          } }))
         } catch {
           if (active && current === revision) setData(previous => ({ ...previous, [name]: {
             error: 'Impossible de déchiffrer les données. Aucun historique partiel ne sera affiché.',

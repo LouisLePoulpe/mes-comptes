@@ -1,7 +1,6 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { useData } from '../data/context'
 import { orderedCards } from '../domain/trend'
-import ExportActions from '../components/ExportActions'
 import ThemeToggle from '../components/ThemeToggle'
 import Info from '../components/Info'
 import ColorPalette from '../components/ColorPalette'
@@ -9,6 +8,8 @@ import { FINANCE_GROUPS } from '../domain/finance'
 import Brand from '../components/Brand'
 import { LogOut } from 'lucide-react'
 import { version } from '../../package.json'
+// Brings the Excel library with it: only fetched when Settings is opened.
+const ExportActions = lazy(() => import('../components/ExportActions'))
 export default function Settings({ user, onImport, onAccounts, onCategories, onRecurring, onDelete, onLogout }) {
   const { accounts, preferences, savePreferences } = useData()
   const [busy, setBusy] = useState(false)
@@ -45,7 +46,7 @@ export default function Settings({ user, onImport, onAccounts, onCategories, onR
     <div className="bg-card rounded-xl p-4 space-y-3">
       <h3 className="font-semibold">Import et export <Info title="Import et export V2.1"><p>L’export V2.1 contient les comptes, montants initiaux, catégories, transactions et périodicités avec leurs identifiants. L’import ne remplace jamais silencieusement une donnée existante.</p></Info></h3>
       <button className="bg-blue-600 text-white rounded px-4 py-2" onClick={onImport}>Importer un export V2.1</button>
-      <ExportActions />
+      <Suspense fallback={null}><ExportActions /></Suspense>
     </div>
     <section aria-label="À propos" className="bg-card rounded-xl p-4 space-y-3">
       <h3 className="font-semibold">À propos</h3>
