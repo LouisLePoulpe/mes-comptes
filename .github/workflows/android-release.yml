@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Tag de release à publier avec l'APK (ex. v2.1.2). Laisser vide pour ne produire que l'artefact."
+        description: "Tag de release à publier avec l'APK (ex. v2.1.3, au format vX.Y.Z). Laisser vide pour ne produire que l'artefact."
         required: false
         default: ""
 permissions:
