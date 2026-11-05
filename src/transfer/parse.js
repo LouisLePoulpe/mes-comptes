@@ -36,6 +36,10 @@ import {
 } from '../domain/recurring.js'
 
 import {
+  REIMBURSED_BY_MAX_LENGTH,
+} from '../domain/reimbursement.js'
+
+import {
   V21_SHEET_NAMES,
 } from './export.js'
 
@@ -91,6 +95,19 @@ const V21_HEADERS =
       'Unité',
       'Active',
       'DateEffet',
+    ],
+  })
+
+
+/*
+ * Colonnes ajoutées après la 2.1.2 : acceptées à la fin de l'onglet, mais
+ * facultatives pour que les anciens exports V2.1 restent importables.
+ */
+const V21_OPTIONAL_HEADERS =
+  Object.freeze({
+    'Transactions': [
+      'RemboursementDate',
+      'RemboursementPar',
     ],
   })
 
@@ -425,10 +442,21 @@ function v21ReadSheet(
           ).trim()
       )
 
+  const withOptional = [
+    ...expected,
+    ...(V21_OPTIONAL_HEADERS[name] || []),
+  ]
+
+  const columns =
+    actual.length ===
+      expected.length
+      ? expected
+      : withOptional
+
   if (
     actual.length !==
-      expected.length ||
-    expected.some(
+      columns.length ||
+    columns.some(
       (header, index) =>
         actual[index] !==
         header
@@ -457,7 +485,7 @@ function v21ReadSheet(
 
         value:
           Object.fromEntries(
-            expected.map(
+            columns.map(
               (
                 header,
                 column
@@ -889,6 +917,43 @@ export function parseExportV21(
             )
           }
 
+          const reimbursedAt =
+            v21Day(
+              value.RemboursementDate,
+              'RemboursementDate',
+              true
+            )
+
+          const reimbursedBy =
+            v21Text(
+              value.RemboursementPar,
+              'RemboursementPar',
+              REIMBURSED_BY_MAX_LENGTH,
+              false
+            )
+
+          if (
+            Boolean(
+              reimbursedAt
+            ) !==
+            Boolean(
+              reimbursedBy
+            )
+          ) {
+            throw new Error(
+              'RemboursementDate et RemboursementPar doivent être renseignés ensemble'
+            )
+          }
+
+          if (
+            reimbursedAt &&
+            type !== FLOWS.EXPENSE
+          ) {
+            throw new Error(
+              'Seule une Sortie peut être remboursée'
+            )
+          }
+
           return {
             id:
               v21Id(
@@ -945,6 +1010,14 @@ export function parseExportV21(
                   recurringRuleId,
 
                   recurringOccurrence,
+                }
+              : {}),
+
+            ...(reimbursedAt
+              ? {
+                  reimbursedAt,
+
+                  reimbursedBy,
                 }
               : {}),
           }

@@ -48,3 +48,12 @@ Categories can be assigned to Charges, Épargne, Plaisirs, savings withdrawal or
 The legend uses percentage of period income and strict comparisons on cent amounts: savings >20%, pleasures <30%, charges <50%. Equality fails the target. With no positive income, percentages and target status are unavailable. The section stays visible for empty periods. The donut shows only positive group amounts; negative net savings remains in the legend.
 
 Accounts and categories sort naturally in French. Dashboard card order and the optional trend values are encrypted under the user's config/dashboard document. Trend regression uses one closing point per day and elapsed time over all available history; the summary shows fitted value at the latest date and change per average month (30.4375 days). It is not a forecast. The theme preference remains device-local, now supporting live system changes. Eight named preset colors supplement the custom color selector.
+
+## Dépenses remboursées
+
+Dans Historique → Modifier, une **Sortie** peut être marquée « Dépense remboursée » avec la date du remboursement et la personne ou l'organisme qui a remboursé (texte libre, les noms déjà utilisés sont proposés).
+
+- Une dépense remboursée **compte pour 0** : solde du compte, variation mensuelle, courbes, total des sorties, Charges et Plaisirs. Son montant d'origine reste enregistré et affiché (barré) dans l'historique.
+- Le remboursement reçu ne doit donc **pas** être saisi en plus comme une Entrée, sinon il serait compté deux fois.
+- Données : `reimbursedAt` (AAAA-MM-JJ) et `reimbursedBy`, chiffrés comme le reste de la transaction ; absents quand la dépense n'est pas remboursée. Seule une Sortie peut en avoir.
+- Excel : deux colonnes `RemboursementDate` et `RemboursementPar` en fin d'onglet Transactions, à renseigner ensemble. Les anciens exports V2.1 sans ces colonnes restent importables. Un fichier avec une seule des deux colonnes est refusé.
