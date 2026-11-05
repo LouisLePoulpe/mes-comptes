@@ -1,4 +1,5 @@
 import { FLOWS, ROLE_IDS } from './categoryRoles.js'
+import { effectiveAmount } from './reimbursement.js'
 
 export const FINANCE_GROUPS = Object.freeze([
   {
@@ -75,7 +76,8 @@ export function financeSummary(
     )
 
     const roleId = category?.roleId
-    const amount = cents(transaction.montant)
+    // Une dépense remboursée compte pour 0 dans Charges et Plaisirs.
+    const amount = cents(effectiveAmount(transaction))
 
     /*
      * ENTRÉES

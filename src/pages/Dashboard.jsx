@@ -7,6 +7,7 @@ import {
 import {
   accountPeriodAmounts,
 } from "../domain/movements"
+import { effectiveAmount } from "../domain/reimbursement"
 import { useState } from "react"
 import { useData } from "../data/context"
 import Info from "../components/Info"
@@ -160,8 +161,9 @@ export default function Dashboard() {
         transaction.type ===
         "Sortie"
       ) {
+        // Une dépense remboursée compte pour 0.
         totalSorties +=
-          transaction.montant
+          effectiveAmount(transaction)
       }
     }
   )

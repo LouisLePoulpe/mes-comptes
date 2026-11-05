@@ -156,6 +156,8 @@ export function createExportV21({
       'Date',
       'RèglePériodiqueID',
       'OccurrencePériodique',
+      'RemboursementDate',
+      'RemboursementPar',
     ],
     transactions.map(
       transaction => ({
@@ -197,6 +199,14 @@ export function createExportV21({
 
         OccurrencePériodique:
           transaction.recurringOccurrence ||
+          '',
+
+        RemboursementDate:
+          transaction.reimbursedAt ||
+          '',
+
+        RemboursementPar:
+          transaction.reimbursedBy ||
           '',
       })
     )
