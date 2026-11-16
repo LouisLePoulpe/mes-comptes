@@ -14,7 +14,10 @@ import { Trash2, Pencil, X, Filter } from "lucide-react"
 import { matchesDescription } from "../domain/search"
 import {
   REIMBURSED_BY_MAX_LENGTH,
+  effectiveAmount,
+  isPartiallyReimbursed,
   isReimbursed,
+  refundedAmount,
   reimbursementFields,
   reimbursers,
 } from "../domain/reimbursement"
@@ -44,6 +47,10 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
     reimbursed: isReimbursed(transaction),
     reimbursedAt: transaction.reimbursedAt || "",
     reimbursedBy: transaction.reimbursedBy || "",
+    reimbursedAmount:
+      transaction.reimbursedAmount
+        ? String(transaction.reimbursedAmount).replace(".", ",")
+        : "",
   })
 
   const set = (key, value) =>
@@ -122,7 +129,7 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
       // Seule une dépense peut être remboursée : sinon les champs sont ignorés.
       reimbursement =
         form.type === FLOWS.EXPENSE && form.reimbursed
-          ? reimbursementFields(form.type, form)
+          ? reimbursementFields(form.type, form, montant)
           : {}
     } catch (cause) {
       return setError(cause.message)
@@ -374,9 +381,18 @@ function ModalEdition({ transaction, categories, cryptoKey, onClose, onSave }) {
             {form.reimbursed && (
               <>
                 <p className="text-xs text-muted">
-                  Une dépense remboursée compte pour 0 dans le solde du compte et dans les statistiques.
-                  Ne saisis pas en plus le remboursement reçu comme une entrée.
+                  Seule la part non remboursée compte dans le solde du compte et dans les statistiques
+                  (0 si la dépense est remboursée en entier). Ne saisis pas en plus le remboursement
+                  reçu comme une entrée.
                 </p>
+
+                <AmountInput
+                  id="Historique-remboursement-montant"
+                  label="Montant remboursé (€) — vide = en entier"
+                  placeholder={form.montant ? `Tout (${form.montant})` : "Tout"}
+                  value={form.reimbursedAmount}
+                  onChange={value => set("reimbursedAmount", value)}
+                />
 
                 <div>
                   <label
@@ -664,9 +680,16 @@ export default function Historique({ cryptoKey }) {
         {filtrées.map(t => (
           <div key={t.id} className="bg-card rounded-xl px-4 py-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <span className={`text-lg font-bold shrink-0 ${isReimbursed(t) ? "text-muted line-through" : t.type === "Transfert" ? "text-link" : t.type === "Entrée" ? "text-positive" : "text-negative"}`}>
-                {t.type === "Transfert" ? "↔ " : t.type === "Entrée" ? "+" : "-"}{t.montant}€
-              </span>
+              {isPartiallyReimbursed(t) ? (
+                <span className="flex flex-col items-start shrink-0 leading-tight">
+                  <span className="text-xs text-muted line-through">-{t.montant}€</span>
+                  <span className="text-lg font-bold text-negative">-{effectiveAmount(t)}€</span>
+                </span>
+              ) : (
+                <span className={`text-lg font-bold shrink-0 ${isReimbursed(t) ? "text-muted line-through" : t.type === "Transfert" ? "text-link" : t.type === "Entrée" ? "text-positive" : "text-negative"}`}>
+                  {t.type === "Transfert" ? "↔ " : t.type === "Entrée" ? "+" : "-"}{t.montant}€
+                </span>
+              )}
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{t.description || "—"}</p>
                 <p className="text-xs text-muted">
@@ -674,7 +697,10 @@ export default function Historique({ cryptoKey }) {
                 </p>
                 {isReimbursed(t) && (
                   <p className="text-xs text-positive">
-                    Remboursée le {formatDay(t.reimbursedAt)} par {t.reimbursedBy}
+                    {isPartiallyReimbursed(t)
+                      ? `Remboursée de ${refundedAmount(t)}€ sur ${t.montant}€`
+                      : "Remboursée"}{" "}
+                    le {formatDay(t.reimbursedAt)} par {t.reimbursedBy}
                   </p>
                 )}
               </div>

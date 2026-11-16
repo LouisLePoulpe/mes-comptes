@@ -4,7 +4,9 @@ import * as XLSX from 'xlsx'
 
 import {
   effectiveAmount,
+  isPartiallyReimbursed,
   isReimbursed,
+  refundedAmount,
   reimbursementFields,
   reimbursers,
 } from '../src/domain/reimbursement.js'
@@ -150,17 +152,20 @@ test('export then import restores the reimbursement date and person exactly', as
   const file = createExportV21(original)
   const book = XLSX.read(await file.arrayBuffer(), { type: 'array' })
   const [header, first, second] = XLSX.utils.sheet_to_json(book.Sheets.Transactions, { header: 1, defval: '' })
-  assert.deepEqual(header.slice(-2), ['RemboursementDate', 'RemboursementPar'])
-  assert.deepEqual(first.slice(-2), ['2026-11-05', 'Pierre'])
-  assert.deepEqual(second.slice(-2), ['', ''])
+  assert.deepEqual(header.slice(-3), ['RemboursementDate', 'RemboursementPar', 'RemboursementMontant'])
+  assert.deepEqual(first.slice(-3), ['2026-11-05', 'Pierre', ''])
+  assert.deepEqual(second.slice(-3), ['', '', ''])
 })
 
-test('an older V2.1 export without the reimbursement columns is still accepted', async () => {
+test('older V2.1 exports (2.1.2 with 11 columns, 2.1.3 with 13) are still accepted', async () => {
   const original = base()
   const legacy = await editTransactionsSheet(original, rows => rows.map(row => row.slice(0, 11)))
   const parsed = parseExportV21(legacy, 'ancien.xlsx')
   assert.equal(parsed.transactions.length, 2)
   assert.ok(parsed.transactions.every(t => !('reimbursedAt' in t) && !('reimbursedBy' in t)))
+
+  const version213 = await editTransactionsSheet(original, rows => rows.map(row => row.slice(0, 13)))
+  assert.deepEqual(parseExportV21(version213, 'v2-1-3.xlsx'), original)
 })
 
 test('import rejects half-filled, invalid or misplaced reimbursement data and partial column sets', async () => {
@@ -208,5 +213,107 @@ test('importing a different reimbursement for an existing transaction is a block
   // A reimbursement present on one side only is also a difference.
   delete existing.transactions[0].reimbursedAt
   delete existing.transactions[0].reimbursedBy
+  assert.throws(() => planImportV21(parsed, existing), /t1/)
+})
+
+const partial = { ...reimbursed, reimbursedAmount: 30 }
+
+test('a partial reimbursement leaves only the unreimbursed part to count', () => {
+  const expense = { type: 'Sortie', montant: 50 }
+  assert.equal(effectiveAmount({ ...expense, ...reimbursed }), 0)
+  assert.equal(refundedAmount({ ...expense, ...reimbursed }), 50)
+  assert.equal(isPartiallyReimbursed({ ...expense, ...reimbursed }), false)
+
+  assert.equal(effectiveAmount({ ...expense, ...partial }), 20)
+  assert.equal(refundedAmount({ ...expense, ...partial }), 30)
+  assert.equal(isPartiallyReimbursed({ ...expense, ...partial }), true)
+
+  // Cents stay exact, and an amount above the expense (edited later) never goes negative.
+  assert.equal(effectiveAmount({ ...expense, ...reimbursed, reimbursedAmount: 0.1 + 0.2 }), 49.7)
+  assert.equal(effectiveAmount({ ...expense, ...reimbursed, reimbursedAmount: 80 }), 0)
+  // The amount is ignored when the expense is not reimbursed.
+  assert.equal(effectiveAmount({ ...expense, reimbursedAmount: 30 }), 50)
+})
+
+test('the refunded amount is validated against the expense and normalised', () => {
+  const input = extra => ({ ...reimbursed, ...extra })
+  assert.deepEqual(reimbursementFields('Sortie', input({ reimbursedAmount: '' }), 50), reimbursed)
+  assert.deepEqual(reimbursementFields('Sortie', input({ reimbursedAmount: '30' }), 50), partial)
+  assert.deepEqual(reimbursementFields('Sortie', input({ reimbursedAmount: '20 + 10,00' }), 50), partial)
+  assert.deepEqual(reimbursementFields('Sortie', input({ reimbursedAmount: 30 }), 50), partial)
+  // Equal to the expense = fully reimbursed: nothing extra is stored.
+  assert.deepEqual(reimbursementFields('Sortie', input({ reimbursedAmount: '50' }), 50), reimbursed)
+  assert.throws(() => reimbursementFields('Sortie', input({ reimbursedAmount: '50,01' }), 50), /dépasser/)
+  assert.throws(() => reimbursementFields('Sortie', input({ reimbursedAmount: '0' }), 50), /supérieur à zéro/)
+  assert.throws(() => reimbursementFields('Sortie', input({ reimbursedAmount: '-5' }), 50))
+  assert.throws(() => reimbursementFields('Sortie', input({ reimbursedAmount: 'abc' }), 50))
+  assert.throws(() => reimbursementFields('Sortie', input({ reimbursedAmount: '10' }), undefined), /montant de la dépense/)
+  // An amount alone is still incomplete: date and person are required.
+  assert.throws(() => reimbursementFields('Sortie', { reimbursedAmount: '10' }, 50), /date/)
+  assert.throws(() => reimbursementFields('Entrée', input({ reimbursedAmount: '10' }), 50), /Sortie/)
+})
+
+test('a partial reimbursement lowers balances and Charges only by the refunded part', () => {
+  const accounts = [{ id: 'bb' }]
+  const initialBalances = [{
+    id: 'start', accountId: 'bb', label: 'Départ', amount: 1000, date: '2026-10-01T00:00:00.000Z',
+  }]
+  // 100 spent, 30 reimbursed: 70 stays.
+  const expense = { id: 'a', type: 'Sortie', montant: 100, banque: 'bb', date: '2026-10-05T00:00:00.000Z', ...partial }
+  assert.equal(accountBalancesAt(accounts, [expense], initialBalances).bb, 930)
+  assert.equal(accountPeriodAmounts(accounts, [expense]).bb, -70)
+
+  const categories = [{ id: 'charges', nom: 'Charges 💸', roleId: 'charges' }]
+  const summary = financeSummary([
+    { type: 'Sortie', montant: 100, categoryId: 'charges', ...partial },
+    { type: 'Sortie', montant: 40, categoryId: 'charges' },
+  ], categories)
+  assert.equal(summary.charges, 110)
+})
+
+test('export then import restores a partial reimbursement amount', async () => {
+  const original = base()
+  original.transactions[0].reimbursedAmount = 30
+  assert.deepEqual(await roundTrip(original), original)
+
+  const file = createExportV21(original)
+  const book = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+  const [, first, second] = XLSX.utils.sheet_to_json(book.Sheets.Transactions, { header: 1, defval: '' })
+  assert.deepEqual(first.slice(-3), ['2026-11-05', 'Pierre', 30])
+  assert.deepEqual(second.slice(-3), ['', '', ''])
+})
+
+test('import validates the refunded amount column', async () => {
+  const original = base()
+  const withRow = (index, patch) => editTransactionsSheet(original, rows =>
+    rows.map((row, i) => (i === index ? Object.assign([...row], patch) : row)))
+
+  // Equal to the expense: accepted and normalised to a full reimbursement.
+  const full = parseExportV21(await withRow(1, { 13: 42 }), 'x.xlsx')
+  assert.equal('reimbursedAmount' in full.transactions[0], false)
+  assert.equal(full.transactions[0].reimbursedAt, '2026-11-05')
+
+  // Decimal comma text, as typed in a spreadsheet.
+  const typed = parseExportV21(await withRow(1, { 13: '12,50' }), 'x.xlsx')
+  assert.equal(typed.transactions[0].reimbursedAmount, 12.5)
+
+  await assert.rejects(async () => parseExportV21(await withRow(1, { 13: 42.01 }), 'x.xlsx'), /dépasse/)
+  await assert.rejects(async () => parseExportV21(await withRow(1, { 13: 0.5, 11: '', 12: '' }), 'x.xlsx'), /exige/)
+  await assert.rejects(async () => parseExportV21(await withRow(1, { 13: 'beaucoup' }), 'x.xlsx'), /RemboursementMontant/)
+  await assert.rejects(async () => parseExportV21(await withRow(1, { 13: -3 }), 'x.xlsx'), /RemboursementMontant/)
+  // An amount on a transaction that is not reimbursed at all is incomplete.
+  await assert.rejects(async () => parseExportV21(await withRow(2, { 13: 5 }), 'x.xlsx'), /exige/)
+})
+
+test('a different refunded amount on an existing transaction is a blocking conflict', async () => {
+  const original = base()
+  original.transactions[0].reimbursedAmount = 30
+  const parsed = await roundTrip(original)
+  const existing = structuredClone(original)
+  assert.equal(planImportV21(parsed, existing).totalSkipped > 0, true)
+
+  existing.transactions[0].reimbursedAmount = 20
+  assert.throws(() => planImportV21(parsed, existing), /t1/)
+  delete existing.transactions[0].reimbursedAmount
   assert.throws(() => planImportV21(parsed, existing), /t1/)
 })

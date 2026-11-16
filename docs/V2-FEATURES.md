@@ -53,7 +53,8 @@ Accounts and categories sort naturally in French. Dashboard card order and the o
 
 Dans Historique → Modifier, une **Sortie** peut être marquée « Dépense remboursée » avec la date du remboursement et la personne ou l'organisme qui a remboursé (texte libre, les noms déjà utilisés sont proposés).
 
-- Une dépense remboursée **compte pour 0** : solde du compte, variation mensuelle, courbes, total des sorties, Charges et Plaisirs. Son montant d'origine reste enregistré et affiché (barré) dans l'historique.
+- Par défaut, la dépense est remboursée **en entier** et **compte pour 0** : solde du compte, variation mensuelle, courbes, total des sorties, Charges et Plaisirs. Son montant d'origine reste enregistré et affiché (barré) dans l'historique.
+- Depuis la 2.1.4, un **montant remboursé** peut être précisé (valeur ou calcul, comme le montant d'une dépense) : seule la part non remboursée compte alors partout (ex. 50 € dépensés, 30 € remboursés → 20 € comptés). Le laisser vide, ou saisir le montant total, signifie « remboursée en entier ». Il ne peut pas dépasser la dépense.
 - Le remboursement reçu ne doit donc **pas** être saisi en plus comme une Entrée, sinon il serait compté deux fois.
-- Données : `reimbursedAt` (AAAA-MM-JJ) et `reimbursedBy`, chiffrés comme le reste de la transaction ; absents quand la dépense n'est pas remboursée. Seule une Sortie peut en avoir.
-- Excel : deux colonnes `RemboursementDate` et `RemboursementPar` en fin d'onglet Transactions, à renseigner ensemble. Les anciens exports V2.1 sans ces colonnes restent importables. Un fichier avec une seule des deux colonnes est refusé.
+- Données : `reimbursedAt` (AAAA-MM-JJ), `reimbursedBy` et, pour un remboursement partiel seulement, `reimbursedAmount`, chiffrés comme le reste de la transaction ; absents quand la dépense n'est pas remboursée. Seule une Sortie peut en avoir.
+- Excel : trois colonnes `RemboursementDate`, `RemboursementPar` et `RemboursementMontant` en fin d'onglet Transactions. Date et personne se renseignent ensemble ; le montant est facultatif (vide = en entier) et exige les deux autres. Les exports 2.1.2 (11 colonnes) et 2.1.3 (13 colonnes) restent importables ; un fichier avec une colonne isolée en trop est refusé.

@@ -100,14 +100,21 @@ const V21_HEADERS =
 
 
 /*
- * Colonnes ajoutées après la 2.1.2 : acceptées à la fin de l'onglet, mais
- * facultatives pour que les anciens exports V2.1 restent importables.
+ * Colonnes ajoutées après la 2.1.2, par étapes successives. Chaque étape est
+ * facultative, mais seules les combinaisons « jamais, première, première + seconde »
+ * sont acceptées : les exports 2.1.2 (11 colonnes) et 2.1.3 (13 colonnes) restent
+ * importables, et un fichier avec une colonne isolée en trop est refusé.
  */
 const V21_OPTIONAL_HEADERS =
   Object.freeze({
     'Transactions': [
-      'RemboursementDate',
-      'RemboursementPar',
+      [
+        'RemboursementDate',
+        'RemboursementPar',
+      ],
+      [
+        'RemboursementMontant',
+      ],
     ],
   })
 
@@ -442,16 +449,25 @@ function v21ReadSheet(
           ).trim()
       )
 
-  const withOptional = [
-    ...expected,
-    ...(V21_OPTIONAL_HEADERS[name] || []),
-  ]
+  const steps =
+    V21_OPTIONAL_HEADERS[name] || []
+
+  const variants =
+    steps.map(
+      (_, index) => [
+        ...expected,
+        ...steps
+          .slice(0, index + 1)
+          .flat(),
+      ]
+    )
 
   const columns =
-    actual.length ===
-      expected.length
-      ? expected
-      : withOptional
+    [expected, ...variants].find(
+      variant =>
+        variant.length ===
+        actual.length
+    ) || expected
 
   if (
     actual.length !==
@@ -932,6 +948,50 @@ export function parseExportV21(
               false
             )
 
+          const montant =
+            v21Amount(
+              value.Montant,
+              'Montant',
+              {
+                positive: true,
+              }
+            )
+
+          const rawRefunded =
+            String(
+              value.RemboursementMontant ??
+              ''
+            ).trim()
+
+          const refundedAmount =
+            rawRefunded
+              ? v21Amount(
+                  rawRefunded,
+                  'RemboursementMontant',
+                  {
+                    positive: true,
+                  }
+                )
+              : 0
+
+          if (
+            refundedAmount &&
+            !reimbursedAt
+          ) {
+            throw new Error(
+              'RemboursementMontant exige RemboursementDate et RemboursementPar'
+            )
+          }
+
+          if (
+            refundedAmount >
+            montant
+          ) {
+            throw new Error(
+              'RemboursementMontant dépasse le montant de la dépense'
+            )
+          }
+
           if (
             Boolean(
               reimbursedAt
@@ -963,14 +1023,7 @@ export function parseExportV21(
 
             type,
 
-            montant:
-              v21Amount(
-                value.Montant,
-                'Montant',
-                {
-                  positive: true,
-                }
-              ),
+            montant,
 
             banque,
 
@@ -1018,6 +1071,17 @@ export function parseExportV21(
                   reimbursedAt,
 
                   reimbursedBy,
+
+                  // Absent = remboursée en entier ; un montant égal à la dépense
+                  // est la même chose et n'est pas conservé.
+                  ...(refundedAmount &&
+                  refundedAmount <
+                    montant
+                    ? {
+                        reimbursedAmount:
+                          refundedAmount,
+                      }
+                    : {}),
                 }
               : {}),
           }
