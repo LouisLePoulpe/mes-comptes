@@ -158,6 +158,7 @@ export function createExportV21({
       'OccurrencePériodique',
       'RemboursementDate',
       'RemboursementPar',
+      'RemboursementMontant',
     ],
     transactions.map(
       transaction => ({
@@ -207,6 +208,10 @@ export function createExportV21({
 
         RemboursementPar:
           transaction.reimbursedBy ||
+          '',
+
+        RemboursementMontant:
+          transaction.reimbursedAmount ??
           '',
       })
     )

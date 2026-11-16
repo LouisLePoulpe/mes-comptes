@@ -1,15 +1,35 @@
 import { FLOWS } from './categoryRoles.js'
+import { calculateAmount } from './amount.js'
 
 export const REIMBURSED_BY_MAX_LENGTH = 100
 
-// Une dépense (Sortie) remboursée garde son montant d'origine dans les données,
-// mais compte pour 0 partout : solde des comptes, courbes, Charges et Plaisirs.
+// Une dépense (Sortie) remboursée garde son montant d'origine dans les données.
+// Sans `reimbursedAmount`, elle est remboursée en entier et compte pour 0 partout
+// (solde des comptes, courbes, Charges et Plaisirs). Avec un montant partiel, seule
+// la différence reste à la charge de l'utilisateur.
 export const isReimbursed = transaction =>
   transaction?.type === FLOWS.EXPENSE &&
   Boolean(transaction.reimbursedAt)
 
+const toCents = value => Math.round(Number(value) * 100)
+
+// Montant effectivement remboursé (le total de la dépense s'il n'est pas précisé).
+export function refundedAmount(transaction) {
+  if (!isReimbursed(transaction)) return 0
+  const refunded = Number(transaction.reimbursedAmount)
+  if (!(refunded > 0)) return transaction.montant
+  return Math.min(toCents(refunded), toCents(transaction.montant)) / 100
+}
+
+export const isPartiallyReimbursed = transaction =>
+  isReimbursed(transaction) &&
+  refundedAmount(transaction) < transaction.montant
+
+// Ce qui reste à la charge de l'utilisateur : base de tous les calculs.
 export const effectiveAmount = transaction =>
-  isReimbursed(transaction) ? 0 : transaction.montant
+  isReimbursed(transaction)
+    ? (toCents(transaction.montant) - toCents(refundedAmount(transaction))) / 100
+    : transaction.montant
 
 function validDay(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? '').trim())
@@ -22,11 +42,18 @@ function validDay(value) {
 }
 
 // Champs à enregistrer dans la transaction : objet vide si elle n'est pas
-// remboursée (les champs sont alors absents, jamais vides), sinon date + personne.
-export function reimbursementFields(type, { reimbursedAt = '', reimbursedBy = '' } = {}) {
+// remboursée (les champs sont alors absents, jamais vides), sinon date + personne
+// et, si le remboursement est partiel, son montant. Un montant égal à la dépense
+// (ou laissé vide) signifie « remboursée en entier » et n'est pas enregistré.
+export function reimbursementFields(
+  type,
+  { reimbursedAt = '', reimbursedBy = '', reimbursedAmount = '' } = {},
+  montant
+) {
   const day = String(reimbursedAt ?? '').trim()
   const by = String(reimbursedBy ?? '').trim()
-  if (!day && !by) return {}
+  const amountText = String(reimbursedAmount ?? '').trim()
+  if (!day && !by && !amountText) return {}
   if (type !== FLOWS.EXPENSE) {
     throw new Error('Seule une dépense (Sortie) peut être remboursée.')
   }
@@ -35,7 +62,19 @@ export function reimbursementFields(type, { reimbursedAt = '', reimbursedBy = ''
   if (by.length > REIMBURSED_BY_MAX_LENGTH) {
     throw new Error(`« Remboursée par » est limité à ${REIMBURSED_BY_MAX_LENGTH} caractères.`)
   }
-  return { reimbursedAt: day, reimbursedBy: by }
+  const fields = { reimbursedAt: day, reimbursedBy: by }
+  if (!amountText) return fields
+
+  const refunded = calculateAmount(amountText)
+  if (!(Number(montant) > 0)) {
+    throw new Error('Indique le montant de la dépense avant celui du remboursement.')
+  }
+  if (toCents(refunded) > toCents(montant)) {
+    throw new Error(`Le montant remboursé ne peut pas dépasser la dépense (${montant} €).`)
+  }
+  return toCents(refunded) === toCents(montant)
+    ? fields
+    : { ...fields, reimbursedAmount: refunded }
 }
 
 // Noms déjà utilisés, les plus fréquents d'abord, pour proposer des suggestions.
