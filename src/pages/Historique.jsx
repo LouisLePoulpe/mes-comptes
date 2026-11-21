@@ -12,6 +12,7 @@ import { deleteDoc, updateDoc } from "../data/offline"
 import { encrypt } from "../crypto"
 import { Trash2, Pencil, X, Filter } from "lucide-react"
 import { matchesDescription } from "../domain/search"
+import { localDay, storedYear, storedMonthNumber, formatStoredDay } from "../domain/calendar"
 import {
   REIMBURSED_BY_MAX_LENGTH,
   effectiveAmount,
@@ -24,8 +25,7 @@ import {
 import SyncStatus from '../components/SyncStatus'
 
 const todayLocal = () => {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+  return localDay()
 }
 
 const formatDay = day => new Date(`${day}T00:00:00`).toLocaleDateString("fr-FR")
@@ -523,11 +523,11 @@ export default function Historique({ cryptoKey }) {
     }
   }
 
-  const anneesDisponibles = [...new Set(transactions.map(t => new Date(t.date).getFullYear()).filter(Boolean))].sort().reverse()
+  const anneesDisponibles = [...new Set(transactions.map(t => storedYear(t.date)).filter(Boolean))].sort().reverse()
 
   const moisDisponibles = [...new Set(transactions
-    .filter(t => !filtres.annee || new Date(t.date).getFullYear() === parseInt(filtres.annee))
-    .map(t => new Date(t.date).getMonth() + 1)
+    .filter(t => !filtres.annee || storedYear(t.date) === parseInt(filtres.annee))
+    .map(t => storedMonthNumber(t.date))
     .filter(Boolean)
   )].sort((a,b) => b - a)
 
@@ -536,9 +536,8 @@ export default function Historique({ cryptoKey }) {
     if (filtres.type && t.type !== filtres.type) return false
     if (filtres.banque && t.banque !== filtres.banque && !(t.type === "Transfert" && t.banqueDest === filtres.banque)) return false
     if (filtres.categorie && t.categorie !== filtres.categorie) return false
-    const d = new Date(t.date)
-    if (filtres.annee && d.getFullYear() !== parseInt(filtres.annee)) return false
-    if (filtres.mois && d.getMonth() + 1 !== parseInt(filtres.mois)) return false
+    if (filtres.annee && storedYear(t.date) !== parseInt(filtres.annee)) return false
+    if (filtres.mois && storedMonthNumber(t.date) !== parseInt(filtres.mois)) return false
     return true
   })
 
@@ -693,7 +692,7 @@ export default function Historique({ cryptoKey }) {
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{t.description || "—"}</p>
                 <p className="text-xs text-muted">
-                  {accountName(t.banque)}{t.type === "Transfert" ? ` → ${accountName(t.banqueDest)}` : ""} · {t.categorie} · {new Date(t.date).toLocaleDateString("fr-FR")}
+                  {accountName(t.banque)}{t.type === "Transfert" ? ` → ${accountName(t.banqueDest)}` : ""} · {t.categorie} · {formatStoredDay(t.date)}
                 </p>
                 {isReimbursed(t) && (
                   <p className="text-xs text-positive">

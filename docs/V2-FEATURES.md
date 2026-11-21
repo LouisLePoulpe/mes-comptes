@@ -58,3 +58,9 @@ Dans Historique → Modifier, une **Sortie** peut être marquée « Dépense rem
 - Le remboursement reçu ne doit donc **pas** être saisi en plus comme une Entrée, sinon il serait compté deux fois.
 - Données : `reimbursedAt` (AAAA-MM-JJ), `reimbursedBy` et, pour un remboursement partiel seulement, `reimbursedAmount`, chiffrés comme le reste de la transaction ; absents quand la dépense n'est pas remboursée. Seule une Sortie peut en avoir.
 - Excel : trois colonnes `RemboursementDate`, `RemboursementPar` et `RemboursementMontant` en fin d'onglet Transactions. Date et personne se renseignent ensemble ; le montant est facultatif (vide = en entier) et exige les deux autres. Les exports 2.1.2 (11 colonnes) et 2.1.3 (13 colonnes) restent importables ; un fichier avec une colonne isolée en trop est refusé.
+
+## Dates et fuseaux horaires
+
+- Une opération est enregistrée à minuit UTC du jour choisi : c'est un **jour**, pas un instant. Il se lit toujours en UTC (`src/domain/calendar.js`), jamais avec `getMonth()` ou `toLocaleDateString()` sans `timeZone`, sinon changer de fuseau (ex. Paris → New York) décale les opérations de la veille et les fait changer de mois.
+- Seule la date « aujourd'hui » (valeur par défaut des formulaires, mois affiché au démarrage, périodiques à générer) suit l'horloge locale de l'appareil.
+- `npm test` rejoue les tests de dates sous plusieurs fuseaux (`npm run test:tz`).

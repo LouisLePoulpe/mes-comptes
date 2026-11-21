@@ -1,3 +1,4 @@
+import { localDay } from "../domain/calendar"
 import AmountInput from "../components/AmountInput"
 import { calculateAmount } from "../domain/amount"
 import {
@@ -21,7 +22,7 @@ export default function Ajouter({ cryptoKey, onSuccess }) {
     banqueDest: "",
     categoryId: "",
     description: "",
-    date: new Date().toISOString().split("T")[0],
+    date: localDay(),
   })
 
   const [loading, setLoading] = useState(false)
