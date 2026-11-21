@@ -1,3 +1,4 @@
+import { localDay, storedDay, formatStoredDay } from '../domain/calendar'
 import { useState } from 'react'
 import {
   addDoc,
@@ -69,9 +70,7 @@ export default function Accounts({
     initialDate,
     setInitialDate,
   ] = useState(
-    new Date()
-      .toISOString()
-      .split('T')[0]
+    localDay()
   )
 
   const [error, setError] =
@@ -144,9 +143,7 @@ export default function Accounts({
     setInitialLabel('')
     setInitialAmount('')
     setInitialDate(
-      new Date()
-        .toISOString()
-        .split('T')[0]
+      localDay()
     )
   }
 
@@ -158,8 +155,7 @@ export default function Accounts({
       String(row.amount)
     )
     setInitialDate(
-      row.date?.split('T')[0] ||
-      row.date
+      storedDay(row.date)
     )
     setError('')
   }
@@ -609,10 +605,8 @@ export default function Accounts({
                         row.accountId
                       )}
                       {' · '}
-                      {new Date(
+                      {formatStoredDay(
                         row.date
-                      ).toLocaleDateString(
-                        'fr-FR'
                       )}
                     </p>
                   </div>

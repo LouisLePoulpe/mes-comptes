@@ -8,6 +8,7 @@ import {
   accountPeriodAmounts,
 } from "../domain/movements"
 import { effectiveAmount } from "../domain/reimbursement"
+import { storedMonth, formatStoredDay, localMonth } from "../domain/calendar"
 import { useState } from "react"
 import { useData } from "../data/context"
 import Info from "../components/Info"
@@ -48,10 +49,7 @@ export default function Dashboard() {
     preferences,
   } = useData()
 
-  const moisCourant =
-    `${new Date().getFullYear()}-${String(
-      new Date().getMonth() + 1
-    ).padStart(2, "0")}`
+  const moisCourant = localMonth()
 
   const [moisFiltre, setMoisFiltre] =
     useState(moisCourant)
@@ -69,14 +67,9 @@ export default function Dashboard() {
   const vus = new Set()
 
   ;[...transactions, ...initialBalances].forEach(item => {
-    const date = new Date(item.date)
+    const key = storedMonth(item.date)
 
-    if (Number.isNaN(date.getTime())) return
-
-    const key =
-      `${date.getFullYear()}-${String(
-        date.getMonth() + 1
-      ).padStart(2, "0")}`
+    if (!key) return
 
     if (!vus.has(key)) {
       vus.add(key)
@@ -112,21 +105,10 @@ export default function Dashboard() {
     moisFiltre === "all"
       ? transactions
       : transactions.filter(transaction => {
-          const date =
-            new Date(transaction.date)
-
-          if (
-            Number.isNaN(date.getTime())
-          ) {
-            return false
-          }
-
-          const key =
-            `${date.getFullYear()}-${String(
-              date.getMonth() + 1
-            ).padStart(2, "0")}`
-
-          return key === moisFiltre
+          return (
+            storedMonth(transaction.date) ===
+            moisFiltre
+          )
         })
 
   /*
@@ -689,10 +671,8 @@ export default function Dashboard() {
               <Tooltip
                 labelFormatter={
                   value =>
-                    new Date(
+                    formatStoredDay(
                       value
-                    ).toLocaleDateString(
-                      "fr-FR"
                     )
                 }
                 formatter={value =>

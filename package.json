@@ -1,7 +1,7 @@
 {
   "name": "mes-comptes",
   "private": true,
-  "version": "2.1.4",
+  "version": "2.1.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "predeploy": "npm run build:production",
     "deploy": "gh-pages -d dist",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test tests/*.test.mjs && npm run test:tz",
+    "test:tz": "TZ=America/New_York node --test tests/calendar.test.mjs && TZ=Pacific/Auckland node --test tests/calendar.test.mjs && TZ=Asia/Kolkata node --test tests/calendar.test.mjs",
     "test:rules": "firebase emulators:exec --only firestore --config firebase.v2.json --project demo-mes-comptes-v2 \"node --test tests/emulator/*.test.mjs\"",
     "test:e2e": "firebase emulators:exec --only firestore,auth --config firebase.v2.json --project demo-mes-comptes-v2 \"playwright test\"",
     "test:offline": "OFFLINE_E2E=1 firebase emulators:exec --only firestore,auth --config firebase.v2.json --project demo-mes-comptes-v2 \"playwright test tests/browser/offline.spec.js tests/browser/recurring-offline.spec.js\"",

@@ -6,18 +6,10 @@ import { userCollection, userDoc } from './references'
 import { createRowDecryptor, reuseRows } from './decryptCache'
 import { DataContext } from './context'
 import { planRecurringOccurrences } from '../domain/recurring'
+import { localDay } from '../domain/calendar'
 
 const COLLECTIONS = ['transactions', 'categories', 'accounts', 'initialBalances', 'recurringRules', 'preferences']
 const EMPTY_ROWS = Object.freeze([])
-
-function localDay() {
-  const now = new Date()
-  return [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
-  ].join('-')
-}
 
 // Mounted once per authenticated/unlocked session, above page navigation.
 export default function DataProvider({ uid, cryptoKey, children }) {

@@ -1,3 +1,4 @@
+import { localDay } from '../domain/calendar'
 import { useState } from 'react'
 import AmountInput from '../components/AmountInput'
 import Info from '../components/Info'
@@ -28,21 +29,6 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-
-
-function localDay() {
-  const now = new Date()
-
-  return [
-    now.getFullYear(),
-    String(
-      now.getMonth() + 1
-    ).padStart(2, '0'),
-    String(
-      now.getDate()
-    ).padStart(2, '0'),
-  ].join('-')
-}
 
 
 const EMPTY_FORM = accounts => ({

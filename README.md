@@ -1,11 +1,13 @@
-# Poulpécule 2.1.4
+# Poulpécule 2.1.5
 
 - [Ouvrir le site](https://louislepoulpe.github.io/mes-comptes/)
-- [Télécharger l’APK Android signée](https://github.com/LouisLePoulpe/mes-comptes/releases/download/v2.1.4/Poulpecule-2.1.4.apk)
-- [Installation et notes de version](https://github.com/LouisLePoulpe/mes-comptes/releases/tag/v2.1.4)
+- [Télécharger l’APK Android signée](https://github.com/LouisLePoulpe/mes-comptes/releases/download/v2.1.5/Poulpecule-2.1.5.apk)
+- [Installation et notes de version](https://github.com/LouisLePoulpe/mes-comptes/releases/tag/v2.1.5)
 
 Comptes personnels isolés, données chiffrées, historique complet, import/export Excel,
 budget configurable, recherche, calculs de montants et modes clair/sombre/système.
+
+La version 2.1.5 corrige le changement de fuseau horaire (voyage) : les opérations restent dans leur mois et leur jour, et la date proposée par défaut est celle de l’appareil.
 
 La version 2.1.4 permet de préciser le montant d’un remboursement partiel : seule la part non remboursée compte dans le solde et les statistiques.
 
